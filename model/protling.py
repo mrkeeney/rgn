@@ -279,7 +279,7 @@ def loop(args):
         for entry in args.evaluation_model:
             configs['run'].evaluation.update({'include_' + entry: True})
 
-    # Override other command-lind arguments
+    # Override other command-line arguments
     if args.gpu_fraction: configs['training'].computing.update({'gpu_fraction': args.gpu_fraction})
     if args.milestone: configs['run'].optimization.update({'validation_milestone': dict(args.milestone)})
 

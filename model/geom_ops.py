@@ -238,7 +238,7 @@ def point_to_coordinate(pt, num_fragments=6, parallel_iterations=4, swap_memory=
 
         return coords
 
-def drmsd(u, v, weights, name=None):
+def drmsd(u, v, bfactors, weights, name=None):
     """ Computes the dRMSD of two tensors of vectors.
 
         Vectors are assumed to be in the third dimension. Op is done element-wise over batch.
@@ -254,6 +254,7 @@ def drmsd(u, v, weights, name=None):
     with tf.name_scope(name, 'dRMSD', [u, v, weights]) as scope:
         u = tf.convert_to_tensor(u, name='u')
         v = tf.convert_to_tensor(v, name='v')
+        bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
         weights = tf.convert_to_tensor(weights, name='weights')
 
         diffs = pairwise_distance(u) - pairwise_distance(v)                                  # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]

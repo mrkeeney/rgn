@@ -176,7 +176,7 @@ class RGNModel(object):
             else:
                 max_length = config.optimization['num_steps']
             dataflow_config = merge_dicts(config.io, config.initialization, config.optimization, config.queueing)
-            ids, primaries, evolutionaries, secondaries, tertiaries, masks, num_stepss = _dataflow(dataflow_config, max_length)
+            ids, primaries, evolutionaries, secondaries, tertiaries, bfactors, masks, num_stepss = _dataflow(dataflow_config, max_length)
 
             # Set up inputs
             inputs = _inputs(merge_dicts(config.architecture, config.initialization), primaries, evolutionaries)
@@ -210,7 +210,7 @@ class RGNModel(object):
 
                 # Convert dihedrals into full 3D structures and compute dRMSDs
                 coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
-                drmsds = _drmsds(merge_dicts(config.optimization, config.loss, config.io), coordinates, tertiaries, weights)
+                drmsds = _drmsds(merge_dicts(config.optimization, config.loss, config.io), coordinates, tertiaries, bfactors, weights)
 
                 if mode == 'evaluation': 
                     prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
@@ -571,7 +571,7 @@ def _dataflow(config, max_length):
     # batching
     inputs = batch_fun(tensors=list(inputs)[:-1], keep_input=keep, dynamic_pad=True, batch_size=config['batch_size'], 
                        name='batching_queue', **batch_kwargs)
-    ids, primaries_batch_major, evolutionaries_batch_major, secondaries_batch_major, tertiaries_batch_major, masks_batch_major, num_stepss = \
+    ids, primaries_batch_major, evolutionaries_batch_major, secondaries_batch_major, tertiaries_batch_major, bfactors_batch_major, masks_batch_major, num_stepss = \
         inputs[sel_slice]
 
     # transpose to time_step major
@@ -591,6 +591,10 @@ def _dataflow(config, max_length):
                      # tertiary sequences, i.e. sequences of 3D coordinates.
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIHEDRALS, BATCH_SIZE, NUM_DIMENSIONS]
 
+    bfactors       = tf.transpose(bfactors_batch_major,     perm=(1, 0, 2), name='bfactors')
+                     # b factors, i.e. experimental temperature factors.
+                     # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIHEDRALS, BATCH_SIZE, NUM_DIMENSIONS]
+
     masks          = tf.transpose(masks_batch_major,          perm=(1, 2, 0), name='masks')
                      # mask matrix for each datum that masks meaningless distances.
                      # [NUM_STEPS - NUM_EDGE_RESIDUES, NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE]
@@ -599,7 +603,7 @@ def _dataflow(config, max_length):
     ids = tf.identity(ids, name='ids')
     num_stepss = tf.identity(num_stepss, name='num_stepss')
 
-    return ids, primaries, evolutionaries, secondaries, tertiaries, masks, num_stepss
+    return ids, primaries, evolutionaries, secondaries, tertiaries, bfactors, masks, num_stepss
 
 def _inputs(config, primaries, evolutionaries):
     """ Returns final concatenated input for use in recurrent layer. """
@@ -1007,7 +1011,7 @@ def _coordinates(config, dihedrals):
 
     return coordinates
 
-def _drmsds(config, coordinates, targets, weights):
+def _drmsds(config, coordinates, targets, bfactors, weights):
     """ Computes reduced weighted dRMSD loss (as specified by weights) 
         between predicted tertiary structures and targets. """
 
@@ -1021,7 +1025,7 @@ def _drmsds(config, coordinates, targets, weights):
         targets     =     targets[1::NUM_DIHEDRALS] # [NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE, NUM_DIMENSIONS]
                   
     # compute per structure dRMSDs
-    drmsds = drmsd(coordinates, targets, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds = drmsd(coordinates, targets, bfactors, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)

@@ -8,8 +8,8 @@
     the functions construct parts of TF graphs, the TF tensors they accept are meant
     to be variables that can change from data point to data point or iteration to
     iteration. On the other hand, the python objects are meant to be fixed parameters
-    used once in the construction of the TF graph and never revisted. Which is which
-    is indicated in each function, and by the fact that python objects are not converted
+    used once in the construction of the TF graph and never revisted. Which is
+    indicated in each function, and by the fact that python objects are not converted
     into TF tensors. Having said that, some funcs are actually somewhat loose, and
     would work with dynamic values for the supposedly fixed arguments. However the
     intended behavior is what's described.
@@ -123,12 +123,14 @@ def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries,
                                     'evolutionary': tf.FixedLenSequenceFeature((num_evo_entries,), tf.float32, allow_missing=True),
                                     'secondary':    tf.FixedLenSequenceFeature((1,),               tf.int64,   allow_missing=True),
                                     'tertiary':     tf.FixedLenSequenceFeature((NUM_DIMENSIONS,),  tf.float32, allow_missing=True),
+                                    'bfactors':     tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True),
                                     'mask':         tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True)})
         id_ = context['id'][0]
         primary =   tf.to_int32(features['primary'][:, 0])
         evolutionary =          features['evolutionary']
         secondary = tf.to_int32(features['secondary'][:, 0])
         tertiary =              features['tertiary']
+        bfactors =              features['bfactors']
         mask =                  features['mask'][:, 0]
 
         # Predicate for when to retain protein
@@ -143,7 +145,7 @@ def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries,
         ter_mask = masking_matrix(mask, name='ter_mask')        
 
         # Return tuple
-        return id_, one_hot_primary, evolutionary, secondary, tertiary, ter_mask, pri_length, keep
+        return id_, one_hot_primary, evolutionary, secondary, tertiary, bfactors, ter_mask, pri_length, keep
 
 def curriculum_weights(base, slope, max_seq_length, name=None):
     ''' Returns a tensor of weights that correspond to the current curriculum, as parametrized by base and slope.
