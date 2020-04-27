@@ -68,8 +68,16 @@ def read_record(file_, num_evo_entries):
                 primary = letter_to_num(file_.readline()[:-1], _aa_dict)
                 dict_.update({'primary': primary})
             elif case('[EVOLUTIONARY]' + '\n'):
+                pos = file_.tell()
+                line = file_.readline()
+                file_.seek(pos)
                 evolutionary = []
-                for residue in range(num_evo_entries): evolutionary.append([float(step) for step in file_.readline().split()])
+                # Workaround for records with >20 rows in the PSSM
+                while "[" not in line:
+                    evolutionary.append([float(step) for step in file_.readline().split()])
+                    pos = file_.tell()
+                    line = file_.readline()
+                    file_.seek(pos)
                 dict_.update({'evolutionary': evolutionary})
             elif case('[SECONDARY]' + '\n'):
                 secondary = letter_to_num(file_.readline()[:-1], _dssp_dict)
@@ -81,6 +89,9 @@ def read_record(file_, num_evo_entries):
             elif case('[MASK]' + '\n'):
                 mask = letter_to_num(file_.readline()[:-1], _mask_dict)
                 dict_.update({'mask': mask})
+            elif case('[BFACTOR]' + '\n'):
+                bfactor = [float(bf) for bf in file_.readline().split()]
+                dict_.update({'bfactor': bfactor})
             elif case('\n'):
                 return dict_
             elif case(''):
@@ -105,6 +116,10 @@ def dict_to_tfrecord(dict_):
     
     if dict_.has_key('mask'):
         feature_lists_dict.update({'mask': _feature_list([_float_feature([step]) for step in dict_['mask']])})
+
+    if dict_.has_key('bfactor'):
+        feature_lists_dict.update({'bfactor': _feature_list([_float_feature([bf]) for bf in dict_['bfactor']])})
+
 
     record = _sequence_example(context=_features({'id': id_}), feature_lists=_feature_lists(feature_lists_dict))
     
