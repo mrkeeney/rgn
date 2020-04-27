@@ -97,6 +97,26 @@ def reduce_l2_norm(input_tensor, reduction_indices=None, keep_dims=None, weights
 
         return tf.sqrt(tf.maximum(tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims), epsilon), name=scope)
 
+
+def reduce_l2_norm_bfactors(input_tensor, bfactors, reduction_indices=None, keep_dims=None, weights=None, epsilon=1e-12, name=None):
+    """ Computes the (possibly weighted) L2 norm of a tensor along the dimensions given in reduction_indices.
+
+    Args:
+        input_tensor: [..., NUM_DIMENSIONS, ...]
+        weights:      [..., NUM_DIMENSIONS, ...]
+
+    Returns:
+                      [..., ...]
+    """
+
+    with tf.name_scope(name, 'reduce_l2_norm', [input_tensor]) as scope:
+        input_tensor = tf.convert_to_tensor(input_tensor, name='input_tensor')
+
+        input_tensor_sq = tf.square(input_tensor)
+        if weights is not None: input_tensor_sq = input_tensor_sq * weights
+
+        return tf.sqrt(tf.maximum(tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims), epsilon), name=scope)
+
 def reduce_l1_norm(input_tensor, reduction_indices=None, keep_dims=None, weights=None, nonnegative=True, name=None):
     """ Computes the (possibly weighted) L1 norm of a tensor along the dimensions given in reduction_indices.
 
@@ -278,6 +298,26 @@ def pairwise_distance(u, name=None):
         u = tf.convert_to_tensor(u, name='u')
         
         diffs = u - tf.expand_dims(u, 1)                                 # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
+        norms = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
+
+        return norms
+
+def pairwise_bfactor_sum(bfactors, name=None):
+    """ Computes the pairwise sum between all vectors in the tensor.
+
+        Vectors are assumed to be in the third dimension. Op is done element-wise over batch.
+
+    Args:
+        bfactors: [NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
+
+    Returns:
+           [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
+
+    """
+    with tf.name_scope(name, 'pairwise_distance', [bfactors]) as scope:
+        bfactors = tf.convert_to_tensor(bfactors, name='u')
+
+        diffs = bfactors - tf.expand_dims(bfactors, 1)                                 # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
         norms = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
 
         return norms

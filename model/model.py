@@ -599,6 +599,11 @@ def _dataflow(config, max_length):
                      # mask matrix for each datum that masks meaningless distances.
                      # [NUM_STEPS - NUM_EDGE_RESIDUES, NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE]
 
+    #PRINT OUT SHAPES HERE.
+    print("TERTIARIES SHAPE: ", tf.shape(tertiaries))
+    print("PRIMARIES SHAPE: ", tf.shape(primaries))
+    print("BFACTORS SHAPE: ", tf.shape(bfactors))
+
     # assign names to the nameless
     ids = tf.identity(ids, name='ids')
     num_stepss = tf.identity(num_stepss, name='num_stepss')
