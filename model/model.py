@@ -574,6 +574,10 @@ def _dataflow(config, max_length):
     ids, primaries_batch_major, evolutionaries_batch_major, secondaries_batch_major, tertiaries_batch_major, bfactors_batch_major, masks_batch_major, num_stepss = \
         inputs[sel_slice]
 
+    print("TERTIARIES BATCH SHAPE: ", tf.shape(tertiaries_batch_major))
+    print("PRIMARIES BATCH SHAPE: ", tf.shape(primaries_batch_major))
+    print("BFACTORS BATCH SHAPE: ", tf.shape(bfactors_batch_major))
+
     # transpose to time_step major
     primaries      = tf.transpose(primaries_batch_major,      perm=(1, 0, 2), name='primaries') 
                      # primary sequences, i.e. one-hot sequences of amino acids.
@@ -591,7 +595,7 @@ def _dataflow(config, max_length):
                      # tertiary sequences, i.e. sequences of 3D coordinates.
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIHEDRALS, BATCH_SIZE, NUM_DIMENSIONS]
 
-    bfactors       = tf.transpose(bfactors_batch_major,     perm=(1, 0, 2), name='bfactors')
+    bfactors       = tf.transpose(bfactors_batch_major,     perm=(1, 0), name='bfactors')
                      # b factors, i.e. experimental temperature factors.
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIHEDRALS, BATCH_SIZE, NUM_DIMENSIONS]
 
