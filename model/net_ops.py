@@ -130,7 +130,7 @@ def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries,
         evolutionary =          features['evolutionary']
         secondary = tf.to_int32(features['secondary'][:, 0])
         tertiary =              features['tertiary']
-        bfactors =              features['bfactors']
+        bfactors =              features['bfactors'][:, 0]
         mask =                  features['mask'][:, 0]
 
         # Predicate for when to retain protein
