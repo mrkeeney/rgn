@@ -180,7 +180,7 @@ class RGNModel(object):
 
             ################################## THIS IS VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
             self.ret_numsteps = num_stepss
-            #self.ret_bfactors = bfactors
+            self.ret_bfactors = bfactors
 
             # Set up inputs
             inputs = _inputs(merge_dicts(config.architecture, config.initialization), primaries, evolutionaries)
@@ -467,7 +467,7 @@ class RGNModel(object):
             self.training_dict_fetcher = self._training_dict_fetcher
             ################################## THIS IS DECLARATION OF FUNCTION OF INTEREST TO LOOK FOR PRINT ################################
             self.dflow_step = self._dflow_step
-            #self.dflow_bfactors = self._dflow_bfactors
+            self.dflow_bfactors = self._dflow_bfactors
 
             del self.start
 

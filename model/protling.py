@@ -379,12 +379,12 @@ def loop(args):
 
     ################################## THIS IS WAY TO ACCESS VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
     session = models['training'].start(models.values())
-    num_stepss2 = models['training'].dflow_step(session)
-    #bfactors_print = models['training'].dflow_bfactors(session)
-    print("num_stepss2 ##############")
-    print(num_stepss2)
-    #print("bfactors ################")
-    #print(bfactors_print)
+    #num_stepss2 = models['training'].dflow_step(session)
+    bfactors_print = models['training'].dflow_bfactors(session)
+    #print("num_stepss2 ##############")
+    #print(num_stepss2)
+    print("bfactors ################")
+    print(bfactors_print)
 
     global_step = models['training'].current_step(session)
     current_log_step = (global_step // configs['run'].io['prediction_frequency']) + 1
