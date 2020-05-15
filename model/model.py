@@ -178,6 +178,10 @@ class RGNModel(object):
             dataflow_config = merge_dicts(config.io, config.initialization, config.optimization, config.queueing)
             ids, primaries, evolutionaries, secondaries, tertiaries, bfactors, masks, num_stepss = _dataflow(dataflow_config, max_length)
 
+            ################################## THIS IS VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
+            self.ret_numsteps = num_stepss
+            #self.ret_bfactors = bfactors
+
             # Set up inputs
             inputs = _inputs(merge_dicts(config.architecture, config.initialization), primaries, evolutionaries)
 
@@ -459,6 +463,12 @@ class RGNModel(object):
             self.is_done      = self._is_done
             self.current_step = self._current_step
             self.finish       = self._finish
+
+            self.training_dict_fetcher = self._training_dict_fetcher
+            ################################## THIS IS DECLARATION OF FUNCTION OF INTEREST TO LOOK FOR PRINT ################################
+            self.dflow_step = self._dflow_step
+            #self.dflow_bfactors = self._dflow_bfactors
+
             del self.start
 
             return session
@@ -482,6 +492,18 @@ class RGNModel(object):
         """ Returns the current global step. """
 
         return session.run(self._global_step)
+
+    def _dflow_step(self, session):
+        """ Returns the  dataflow step. """
+        ################################## THIS IS FUNCTION TO FETCH VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
+
+        return session.run(self.ret_numsteps)
+
+    def _dflow_bfactors(self, session):
+        return session.run(self.ret_bfactors)
+
+    def _training_dict_fetcher(self, session):
+        return session.run(self.training_dict)
 
     def _finish(self, session, save=True, close_session=True, reset_graph=True):
         """ Instructs the model to shutdown. """
@@ -573,10 +595,6 @@ def _dataflow(config, max_length):
                        name='batching_queue', **batch_kwargs)
     ids, primaries_batch_major, evolutionaries_batch_major, secondaries_batch_major, tertiaries_batch_major, bfactors_batch_major, masks_batch_major, num_stepss = \
         inputs[sel_slice]
-
-    print("TERTIARIES BATCH SHAPE: ", tf.shape(tertiaries_batch_major))
-    print("PRIMARIES BATCH SHAPE: ", tf.shape(primaries_batch_major))
-    print("BFACTORS BATCH SHAPE: ", tf.shape(bfactors_batch_major))
 
     # transpose to time_step major
     primaries      = tf.transpose(primaries_batch_major,      perm=(1, 0, 2), name='primaries') 

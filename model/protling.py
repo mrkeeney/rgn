@@ -376,11 +376,21 @@ def loop(args):
 
     # start head model and related prep
     stdout_err_file_handle.flush()
+
+    ################################## THIS IS WAY TO ACCESS VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
     session = models['training'].start(models.values())
+    num_stepss2 = models['training'].dflow_step(session)
+    #bfactors_print = models['training'].dflow_bfactors(session)
+    print("num_stepss2 ##############")
+    print(num_stepss2)
+    #print("bfactors ################")
+    #print(bfactors_print)
+
     global_step = models['training'].current_step(session)
     current_log_step = (global_step // configs['run'].io['prediction_frequency']) + 1
     log_dir = os.path.join(run_dir, str(current_log_step))
     restart = False
+    sys.__stdout__.flush()
 
     # predict or train depending on set mode behavior
     if args.prediction_only:
