@@ -176,7 +176,7 @@ class RGNModel(object):
             else:
                 max_length = config.optimization['num_steps']
             dataflow_config = merge_dicts(config.io, config.initialization, config.optimization, config.queueing)
-            ids, primaries, evolutionaries, secondaries, tertiaries, bfactors, masks, num_stepss = _dataflow(dataflow_config, max_length)
+            ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, num_stepss = _dataflow(dataflow_config, max_length)
 
             ################################## THIS IS VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
             self.ret_numsteps = num_stepss
@@ -603,7 +603,7 @@ def _dataflow(config, max_length):
     # batching
     inputs = batch_fun(tensors=list(inputs)[:-1], keep_input=keep, dynamic_pad=True, batch_size=config['batch_size'], 
                        name='batching_queue', **batch_kwargs)
-    ids, primaries_batch_major, evolutionaries_batch_major, secondaries_batch_major, tertiaries_batch_major, bfactors_batch_major, masks_batch_major, num_stepss = \
+    ids, primaries_batch_major, evolutionaries_batch_major, secondaries_batch_major, tertiaries_batch_major, masks_batch_major, bfactors_batch_major, num_stepss = \
         inputs[sel_slice]
 
     # transpose to time_step major
@@ -623,13 +623,13 @@ def _dataflow(config, max_length):
                      # tertiary sequences, i.e. sequences of 3D coordinates.
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIHEDRALS, BATCH_SIZE, NUM_DIMENSIONS]
 
-    bfactors       = tf.transpose(bfactors_batch_major,     perm=(1, 0), name='bfactors')
-                     # b factors, i.e. experimental temperature factors.
-                     # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIHEDRALS, BATCH_SIZE, NUM_DIMENSIONS]
-
     masks          = tf.transpose(masks_batch_major,          perm=(1, 2, 0), name='masks')
                      # mask matrix for each datum that masks meaningless distances.
                      # [NUM_STEPS - NUM_EDGE_RESIDUES, NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE]
+
+    bfactors       = tf.transpose(bfactors_batch_major,     perm=(0, 1), name='bfactors')
+                     # b factors, i.e. experimental temperature factors.
+                     # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIMENSIONS, BATCH_SIZE]
 
     #PRINT OUT SHAPES HERE.
     print("TERTIARIES SHAPE: ", tf.shape(tertiaries))
@@ -640,7 +640,7 @@ def _dataflow(config, max_length):
     ids = tf.identity(ids, name='ids')
     num_stepss = tf.identity(num_stepss, name='num_stepss')
 
-    return ids, primaries, evolutionaries, secondaries, tertiaries, bfactors, masks, num_stepss
+    return ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, num_stepss
 
 def _inputs(config, primaries, evolutionaries):
     """ Returns final concatenated input for use in recurrent layer. """

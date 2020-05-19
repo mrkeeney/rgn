@@ -123,15 +123,15 @@ def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries,
                                     'evolutionary': tf.FixedLenSequenceFeature((num_evo_entries,), tf.float32, allow_missing=True),
                                     'secondary':    tf.FixedLenSequenceFeature((1,),               tf.int64,   allow_missing=True),
                                     'tertiary':     tf.FixedLenSequenceFeature((NUM_DIMENSIONS,),  tf.float32, allow_missing=True),
-                                    'bfactors':     tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True),
-                                    'mask':         tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True)})
+                                    'mask':         tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True),
+                                    'bfactor':     tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True)})
         id_ = context['id'][0]
         primary =   tf.to_int32(features['primary'][:, 0])
         evolutionary =          features['evolutionary']
         secondary = tf.to_int32(features['secondary'][:, 0])
         tertiary =              features['tertiary']
-        bfactors =              features['bfactors'][:, 0]
         mask =                  features['mask'][:, 0]
+        bfactor =              features['bfactor'][:, 0]
 
         # Predicate for when to retain protein
         pri_length = tf.size(primary)
@@ -145,7 +145,7 @@ def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries,
         ter_mask = masking_matrix(mask, name='ter_mask')        
 
         # Return tuple
-        return id_, one_hot_primary, evolutionary, secondary, tertiary, bfactors, ter_mask, pri_length, keep
+        return id_, one_hot_primary, evolutionary, secondary, tertiary, ter_mask, bfactor, pri_length, keep
 
 def curriculum_weights(base, slope, max_seq_length, name=None):
     ''' Returns a tensor of weights that correspond to the current curriculum, as parametrized by base and slope.
