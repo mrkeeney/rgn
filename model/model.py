@@ -632,9 +632,9 @@ def _dataflow(config, max_length):
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIMENSIONS, BATCH_SIZE]
 
     #PRINT OUT SHAPES HERE.
-    print("TERTIARIES SHAPE: ", tf.shape(tertiaries))
-    print("PRIMARIES SHAPE: ", tf.shape(primaries))
-    print("BFACTORS SHAPE: ", tf.shape(bfactors))
+    #print("TERTIARIES SHAPE: ", tf.shape(tertiaries))
+    #print("PRIMARIES SHAPE: ", tf.shape(primaries))
+    #print("BFACTORS SHAPE: ", tf.shape(bfactors))
 
     # assign names to the nameless
     ids = tf.identity(ids, name='ids')
