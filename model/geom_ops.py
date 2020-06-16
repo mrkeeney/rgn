@@ -24,11 +24,15 @@ import numpy as np
 import tensorflow as tf
 import collections
 
+np.set_printoptions(threshold=np.inf)
+
 # Constants
 NUM_DIMENSIONS = 3
 NUM_DIHEDRALS = 3
 BOND_LENGTHS = np.array([145.801, 152.326, 132.868], dtype='float32')
 BOND_ANGLES  = np.array([  2.124,   1.941,   2.028], dtype='float32')
+
+saved_bfactors = []
 
 # Functions
 def angularize(input_tensor, name=None):
@@ -92,26 +96,6 @@ def reduce_l2_norm(input_tensor, reduction_indices=None, keep_dims=None, weights
     with tf.name_scope(name, 'reduce_l2_norm', [input_tensor]) as scope:
         input_tensor = tf.convert_to_tensor(input_tensor, name='input_tensor')
         
-        input_tensor_sq = tf.square(input_tensor)
-        if weights is not None: input_tensor_sq = input_tensor_sq * weights
-
-        return tf.sqrt(tf.maximum(tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims), epsilon), name=scope)
-
-
-def reduce_l2_norm_bfactors(input_tensor, reduction_indices=None, keep_dims=None, weights=None, epsilon=1e-12, name=None):
-    """ Computes the (possibly weighted) L2 norm of a tensor along the dimensions given in reduction_indices.
-
-    Args:
-        input_tensor: [..., NUM_DIMENSIONS, ...]
-        weights:      [..., NUM_DIMENSIONS, ...]
-
-    Returns:
-                      [..., ...]
-    """
-
-    with tf.name_scope(name, 'reduce_l2_norm', [input_tensor]) as scope:
-        input_tensor = tf.convert_to_tensor(input_tensor, name='input_tensor')
-
         input_tensor_sq = tf.square(input_tensor)
         if weights is not None: input_tensor_sq = input_tensor_sq * weights
 
@@ -277,12 +261,17 @@ def drmsd(u, v, bfactors, weights, name=None):
         bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
         weights = tf.convert_to_tensor(weights, name='weights')
 
-        diffs = pairwise_distance(u) - pairwise_distance(v)                       # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
-        bfact_sums = pairwise_sums_bfactors(bfactors)
-        bfact_norms = tf.divide(diffs, bfact_sums)
+        u_dis, udiffs = pairwise_distance(u)
+        v_dis, vdiffs = pairwise_distance(v)
+
+        diffs = u_dis - v_dis
+
+        #diffs = pairwise_distance(u) - pairwise_distance(v)                       # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
+        bfact_sums = pairwise_sums_bfactors()
+        bfact_norms = np.divide(diffs, 1) #EVENTUALLY DIVIDE BY BFACT_SUMS
         norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 
-        return norms
+        return norms, diffs, u_dis, v_dis, bfactors, bfact_sums
 
 def pairwise_distance(u, name=None):
     """ Computes the pairwise distance (l2 norm) between all vectors in the tensor.
@@ -298,27 +287,27 @@ def pairwise_distance(u, name=None):
     """
     with tf.name_scope(name, 'pairwise_distance', [u]) as scope:
         u = tf.convert_to_tensor(u, name='u')
+
+        expand = tf.expand_dims(u, 1)
         
-        diffs = u - tf.expand_dims(u, 1)                                 # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
+        diffs = u - expand                               # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
         norms = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
 
-        return norms
+        return norms, expand
 
-def pairwise_sums_bfactors(bfactors, name=None):
-    """ Computes the pairwise distance (l2 norm) between all vectors in the tensor.
+def pairwise_sums_bfactors():
+    bfact_sums = []
+    for protein in saved_bfactors:
+        sums = []
+        for bfactor1 in protein:
+            bfactor1sums = []
+            for bfactor2 in protein:
+                sum = bfactor1 + bfactor2
+                bfactor1sums.append(sum)
+            sums.append(bfactor1sums)
+        bfact_sums.append(sums)
+    return bfact_sums
 
-        Vectors are assumed to be in the third dimension. Op is done element-wise over batch.
-
-     Args:
-        u: [NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
-
-    Returns:
-           [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
-
-    """
-    with tf.name_scope(name, 'pairwise_distance', [bfactors]) as scope:
-        bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
-
-        sums = bfactors + tf.expand_dims(bfactors, 1)                                 # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
-
-        return sums
+def save_bfactors(bfactors):
+    global saved_bfactors
+    saved_bfactors = bfactors

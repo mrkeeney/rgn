@@ -23,6 +23,8 @@ __license__ = "MIT"
 import numpy as np
 import tensorflow as tf
 
+np.set_printoptions(threshold=np.inf)
+
 # Constants
 NUM_AAS = 20
 NUM_DIMENSIONS = 3
@@ -124,7 +126,7 @@ def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries,
                                     'secondary':    tf.FixedLenSequenceFeature((1,),               tf.int64,   allow_missing=True),
                                     'tertiary':     tf.FixedLenSequenceFeature((NUM_DIMENSIONS,),  tf.float32, allow_missing=True),
                                     'mask':         tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True),
-                                    'bfactor':     tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True)})
+                                    'bfactor':      tf.FixedLenSequenceFeature((1,),               tf.float32, allow_missing=True)})
         id_ = context['id'][0]
         primary =   tf.to_int32(features['primary'][:, 0])
         evolutionary =          features['evolutionary']
@@ -142,7 +144,7 @@ def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries,
 
         # Generate tertiary masking matrix. If mask is missing then assume all residues are present
         mask = tf.cond(tf.not_equal(tf.size(mask), 0), lambda: mask, lambda: tf.ones([pri_length - num_edge_residues]))
-        ter_mask = masking_matrix(mask, name='ter_mask')        
+        ter_mask = masking_matrix(mask, name='ter_mask')
 
         # Return tuple
         return id_, one_hot_primary, evolutionary, secondary, tertiary, ter_mask, bfactor, pri_length, keep

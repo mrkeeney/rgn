@@ -16,6 +16,9 @@ from pprint import pprint
 from setproctitle import setproctitle
 from model import RGNModel
 from config import RGNConfig, RunConfig
+from geom_ops import save_bfactors
+
+np.set_printoptions(threshold=np.inf)
 
 # constant directory and file names
 RUNS_DIRNAME = 'runs'
@@ -379,18 +382,43 @@ def loop(args):
 
     ################################## THIS IS WAY TO ACCESS VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
     session = models['training'].start(models.values())
+
     #num_stepss2 = models['training'].dflow_step(session)
-    #bfactors_print = models['training'].dflow_bfactors(session)
-    #primaries_print = models['training'].dflow_primaries(session)
-    #tertiaries_print = models['training'].dflow_tertiaries(session)
     #print("num_stepss2 ##############")
     #print(num_stepss2)
-    #print("bfactors ################")
-    #print(bfactors_print)
+
+    bfactors_print = models['training'].dflow_bfactors(session)
+    print("bfactors ################")
+    print(bfactors_print)
+    save_bfactors(bfactors_print)
+
+    #primaries_print = models['training'].dflow_primaries(session)
     #print("primaries ################")
     #print(primaries_print)
+
+    #tertiaries_print = models['training'].dflow_tertiaries(session)
     #print("tertiaries ################")
     #print(tertiaries_print)
+
+    #diffs_print = models['training'].dflow_diffs(session)
+    #print("diffs ##############")
+    #print(diffs_print)
+
+    #u_print = models['training'].dflow_u(session)
+    #print("u ##############")
+    #print(u_print)
+
+    #v_print = models['training'].dflow_v(session)
+    #print("v ##############")
+    #print(v_print)
+
+    #bfactors_2_print = models['training'].dflow_bfactors_2(session)
+    #print("bfactors_2 ##############")
+    #print(bfactors_2_print)
+
+    #bfact_sums_print = models['training'].dflow_bfact_sums(session)
+    #print("bfact_sums ##############")
+    #print(bfact_sums_print)
 
     global_step = models['training'].current_step(session)
     current_log_step = (global_step // configs['run'].io['prediction_frequency']) + 1

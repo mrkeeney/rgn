@@ -30,6 +30,8 @@ from itertools import izip_longest
 
 # Public interface
 
+np.set_printoptions(threshold=np.inf)
+
 SCOPE = 'RGN'
 DUMMY_LOSS = -1.
 PREFETCH_BUFFER = 10
@@ -216,7 +218,13 @@ class RGNModel(object):
 
                 # Convert dihedrals into full 3D structures and compute dRMSDs
                 coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
-                drmsds = _drmsds(merge_dicts(config.optimization, config.loss, config.io), coordinates, tertiaries, bfactors, weights)
+                drmsds, diffs, u, v, bfactors_2, bfact_sums = _drmsds(merge_dicts(config.optimization, config.loss, config.io), coordinates, tertiaries, bfactors, weights)
+                self.ret_diffs = diffs
+                self.ret_u = u
+                self.ret_v = v
+                self.ret_bfactors_2 = bfactors_2
+                self.ret_bfact_sums = bfact_sums
+                self.ret_norms = drmsds
 
                 if mode == 'evaluation': 
                     prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
@@ -472,6 +480,11 @@ class RGNModel(object):
             self.dflow_bfactors = self._dflow_bfactors
             self.dflow_primaries = self._dflow_primaries
             self.dflow_tertiaries = self._dflow_tertiaries
+            self.dflow_diffs = self._dflow_diffs
+            self.dflow_u = self._dflow_u
+            self.dflow_v = self._dflow_v
+            self.dflow_bfactors_2 = self._dflow_bfactors_2
+            self.dflow_bfact_sums = self._dflow_bfact_sums
 
             del self.start
 
@@ -514,6 +527,24 @@ class RGNModel(object):
 
     def _training_dict_fetcher(self, session):
         return session.run(self.training_dict)
+
+    def _dflow_diffs(self, session):
+        return session.run(self.ret_diffs)
+
+    def _dflow_u(self, session):
+        return session.run(self.ret_u)
+
+    def _dflow_v(self, session):
+        return session.run(self.ret_v)
+
+    def _dflow_bfactors_2(self, session):
+        return session.run(self.ret_bfactors_2)
+
+    def _dflow_bfact_sums(self, session):
+        return session.run(self.ret_bfact_sums)
+
+    def _bfactors_to_array(self, bfactors):
+        return
 
     def _finish(self, session, save=True, close_session=True, reset_graph=True):
         """ Instructs the model to shutdown. """
@@ -1062,12 +1093,12 @@ def _drmsds(config, coordinates, targets, bfactors, weights):
         targets     =     targets[1::NUM_DIHEDRALS] # [NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE, NUM_DIMENSIONS]
                   
     # compute per structure dRMSDs
-    drmsds = drmsd(coordinates, targets, bfactors, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds, diffs, u, v, bfactors_2, bfact_sums = drmsd(coordinates, targets, bfactors, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)
 
-    return drmsds
+    return drmsds, diffs, u, v, bfactors_2, bfact_sums
 
 def _reduce_loss_quotient(config, losses, masks, group_filter, name_prefix=''):
     """ Reduces loss according to normalization order. """
