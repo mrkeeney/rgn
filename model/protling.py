@@ -16,7 +16,6 @@ from pprint import pprint
 from setproctitle import setproctitle
 from model import RGNModel
 from config import RGNConfig, RunConfig
-from geom_ops import save_bfactors
 
 np.set_printoptions(threshold=np.inf)
 
@@ -387,10 +386,10 @@ def loop(args):
     #print("num_stepss2 ##############")
     #print(num_stepss2)
 
-    bfactors_print = models['training'].dflow_bfactors(session)
-    print("bfactors ################")
-    print(bfactors_print)
-    save_bfactors(bfactors_print)
+    #bfactors_print = models['training'].dflow_bfactors(session)
+    #print("bfactors ################")
+    #print(bfactors_print)
+    #save_bfactors(bfactors_print)
 
     #primaries_print = models['training'].dflow_primaries(session)
     #print("primaries ################")
@@ -416,9 +415,9 @@ def loop(args):
     #print("bfactors_2 ##############")
     #print(bfactors_2_print)
 
-    #bfact_sums_print = models['training'].dflow_bfact_sums(session)
-    #print("bfact_sums ##############")
-    #print(bfact_sums_print)
+    bfact_sums_print = models['training'].dflow_bfact_sums(session)
+    print("bfact_sums ##############")
+    print(bfact_sums_print)
 
     global_step = models['training'].current_step(session)
     current_log_step = (global_step // configs['run'].io['prediction_frequency']) + 1

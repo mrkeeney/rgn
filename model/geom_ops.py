@@ -261,17 +261,17 @@ def drmsd(u, v, bfactors, weights, name=None):
         bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
         weights = tf.convert_to_tensor(weights, name='weights')
 
-        u_dis, udiffs = pairwise_distance(u)
-        v_dis, vdiffs = pairwise_distance(v)
+        u_dis, uexpand, udiffs = pairwise_distance(u)
+        v_dis, vexpand, vdiffs = pairwise_distance(v)
 
         diffs = u_dis - v_dis
 
         #diffs = pairwise_distance(u) - pairwise_distance(v)                       # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
-        bfact_sums = pairwise_sums_bfactors()
+        bfact_sums = pairwise_sums_bfactors_tensorflow(bfactors)
         bfact_norms = np.divide(diffs, 1) #EVENTUALLY DIVIDE BY BFACT_SUMS
         norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 
-        return norms, diffs, u_dis, v_dis, bfactors, bfact_sums
+        return norms, diffs, udiffs, vdiffs, bfactors, bfact_sums
 
 def pairwise_distance(u, name=None):
     """ Computes the pairwise distance (l2 norm) between all vectors in the tensor.
@@ -293,21 +293,32 @@ def pairwise_distance(u, name=None):
         diffs = u - expand                               # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
         norms = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
 
-        return norms, expand
+        return norms, expand, diffs
 
-def pairwise_sums_bfactors():
-    bfact_sums = []
-    for protein in saved_bfactors:
-        sums = []
-        for bfactor1 in protein:
-            bfactor1sums = []
-            for bfactor2 in protein:
-                sum = bfactor1 + bfactor2
-                bfactor1sums.append(sum)
-            sums.append(bfactor1sums)
-        bfact_sums.append(sums)
-    return bfact_sums
+def pairwise_sums_bfactors_tensorflow(bfactors):
 
-def save_bfactors(bfactors):
-    global saved_bfactors
-    saved_bfactors = bfactors
+    #shape = tf.size(bfactors)
+    #shape = bfactors.get_shape().as_list()
+    bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
+    expand = tf.expand_dims(bfactors, 1)
+
+    #bfact_tile = tf.tile(bfactors, [2, 1])
+    #bfact_sums = tf.transpose(bfact_tile, perm=[1, 0])
+    return expand
+
+#def pairwise_sums_bfactors():
+#    bfact_sums = []
+#    for protein in saved_bfactors:
+#        sums = []
+#        for bfactor1 in protein:
+#            bfactor1sums = []
+#            for bfactor2 in protein:
+#                sum = bfactor1 + bfactor2
+#                bfactor1sums.append(sum)
+#            sums.append(bfactor1sums)
+#        bfact_sums.append(sums)
+#    return bfact_sums
+
+#def save_bfactors(bfactors):
+#    global saved_bfactors
+#    saved_bfactors = bfactors
