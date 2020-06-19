@@ -101,7 +101,7 @@ def reduce_l2_norm(input_tensor, reduction_indices=None, keep_dims=None, weights
 
         reduce_sum = tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims)
 
-        return tf.sqrt(tf.maximum(tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims), epsilon), name=scope), reduce_sum
+        return tf.sqrt(tf.maximum(tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims), epsilon), name=scope)
 
 def reduce_l1_norm(input_tensor, reduction_indices=None, keep_dims=None, weights=None, nonnegative=True, name=None):
     """ Computes the (possibly weighted) L1 norm of a tensor along the dimensions given in reduction_indices.
@@ -260,21 +260,21 @@ def drmsd(u, v, bfactors, weights, name=None):
     with tf.name_scope(name, 'dRMSD', [u, v, weights]) as scope:
         u = tf.convert_to_tensor(u, name='u')
         v = tf.convert_to_tensor(v, name='v')
+
         bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
         weights = tf.convert_to_tensor(weights, name='weights')
 
-        u_dis, ureduce, udiffs = pairwise_distance(u)
-        v_dis, vreduce, vdiffs = pairwise_distance(v)
+        #Calculate the difference in pairwise distances for target coordinates and known coordinates.
+        diffs = pairwise_distance(u) - pairwise_distance(v)                       # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
 
-        diffs = u_dis - v_dis
-
-        #diffs = pairwise_distance(u) - pairwise_distance(v)                       # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
+        #Calculate the pairwise sums of bfactors that correspond to the pairwise distances for target and known coordinates.
         bfact_sums = remove_zeros(pairwise_sums_bfactors(bfactors))
 
+        #Divide the pairwise distances by the bfactor pairwise sums.
         bfact_norms = np.divide(diffs, bfact_sums)
-        norms, reduce_sum = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
+        norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 
-        return norms, diffs, udiffs, vdiffs, bfactors, bfact_sums
+        return norms, diffs, u, v, bfactors, bfact_sums
 
 def pairwise_distance(u, name=None):
     """ Computes the pairwise distance (l2 norm) between all vectors in the tensor.
@@ -294,9 +294,9 @@ def pairwise_distance(u, name=None):
         expand = tf.expand_dims(u, 1)
         
         diffs = u - expand                               # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
-        norms, reduce_sum = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
+        norms = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
 
-        return norms, reduce_sum, diffs
+        return norms
 
 def pairwise_sums_bfactors(bfactors):
     bfactors = tf.convert_to_tensor(bfactors, name='bfactors')

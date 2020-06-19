@@ -179,7 +179,7 @@ class RGNModel(object):
             dataflow_config = merge_dicts(config.io, config.initialization, config.optimization, config.queueing)
             ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, num_stepss = _dataflow(dataflow_config, max_length)
 
-            ################################## THIS IS VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
+            #Return tensors to be printed.
             self.ret_numsteps = num_stepss
             self.ret_bfactors = bfactors
             self.ret_primaries = primaries
@@ -218,6 +218,8 @@ class RGNModel(object):
                 # Convert dihedrals into full 3D structures and compute dRMSDs
                 coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
                 drmsds, diffs, u, v, bfactors_2, bfact_sums = _drmsds(merge_dicts(config.optimization, config.loss, config.io), coordinates, tertiaries, bfactors, weights)
+
+                #Return tensors to be printed.
                 self.ret_diffs = diffs
                 self.ret_u = u
                 self.ret_v = v
@@ -474,7 +476,8 @@ class RGNModel(object):
             self.finish       = self._finish
 
             self.training_dict_fetcher = self._training_dict_fetcher
-            ################################## THIS IS DECLARATION OF FUNCTION OF INTEREST TO LOOK FOR PRINT ################################
+
+            #Data flow for tensors that get printed.
             self.dflow_step = self._dflow_step
             self.dflow_bfactors = self._dflow_bfactors
             self.dflow_primaries = self._dflow_primaries
@@ -509,9 +512,10 @@ class RGNModel(object):
 
         return session.run(self._global_step)
 
+    #Data flow methods for printing tensors.
+
     def _dflow_step(self, session):
         """ Returns the  dataflow step. """
-        ################################## THIS IS FUNCTION TO FETCH VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
 
         return session.run(self.ret_numsteps)
 

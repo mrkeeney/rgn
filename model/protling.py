@@ -378,46 +378,45 @@ def loop(args):
 
     # start head model and related prep
     stdout_err_file_handle.flush()
-
-    ################################## THIS IS WAY TO ACCESS VARIABLE OF INTEREST TO LOOK FOR PRINT ################################
     session = models['training'].start(models.values())
 
+    # PRINT TENSORS
     #num_stepss2 = models['training'].dflow_step(session)
-    #print("num_stepss2 ##############")
+    #print("num_stepss2:")
     #print(num_stepss2)
 
     #bfactors_print = models['training'].dflow_bfactors(session)
-    #print("bfactors ################")
+    #print("bfactors:")
     #print(bfactors_print)
     #save_bfactors(bfactors_print)
 
     #primaries_print = models['training'].dflow_primaries(session)
-    #print("primaries ################")
+    #print("primaries:")
     #print(primaries_print)
 
     #tertiaries_print = models['training'].dflow_tertiaries(session)
-    #print("tertiaries ################")
+    #print("tertiaries:")
     #print(tertiaries_print)
 
     #diffs_print = models['training'].dflow_diffs(session)
-    #print("diffs ##############")
+    #print("diffs:")
     #print(diffs_print)
 
     #u_print = models['training'].dflow_u(session)
-    #print("u ##############")
+    #print("u:")
     #print(u_print)
 
     #v_print = models['training'].dflow_v(session)
-    #print("v ##############")
+    #print("v:")
     #print(v_print)
 
     #bfactors_2_print = models['training'].dflow_bfactors_2(session)
-    #print("bfactors_2 ##############")
+    #print("bfactors_2:")
     #print(bfactors_2_print)
 
-    bfact_sums_print = models['training'].dflow_bfact_sums(session)
-    print("bfact_sums ##############")
-    print(bfact_sums_print)
+    #bfact_sums_print = models['training'].dflow_bfact_sums(session)
+    #print("bfact_sums:")
+    #print(bfact_sums_print)
 
     global_step = models['training'].current_step(session)
     current_log_step = (global_step // configs['run'].io['prediction_frequency']) + 1
