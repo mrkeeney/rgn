@@ -99,7 +99,9 @@ def reduce_l2_norm(input_tensor, reduction_indices=None, keep_dims=None, weights
         input_tensor_sq = tf.square(input_tensor)
         if weights is not None: input_tensor_sq = input_tensor_sq * weights
 
-        return tf.sqrt(tf.maximum(tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims), epsilon), name=scope)
+        reduce_sum = tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims)
+
+        return tf.sqrt(tf.maximum(tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims), epsilon), name=scope), reduce_sum
 
 def reduce_l1_norm(input_tensor, reduction_indices=None, keep_dims=None, weights=None, nonnegative=True, name=None):
     """ Computes the (possibly weighted) L1 norm of a tensor along the dimensions given in reduction_indices.
@@ -261,15 +263,16 @@ def drmsd(u, v, bfactors, weights, name=None):
         bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
         weights = tf.convert_to_tensor(weights, name='weights')
 
-        u_dis, uexpand, udiffs = pairwise_distance(u)
-        v_dis, vexpand, vdiffs = pairwise_distance(v)
+        u_dis, ureduce, udiffs = pairwise_distance(u)
+        v_dis, vreduce, vdiffs = pairwise_distance(v)
 
         diffs = u_dis - v_dis
 
         #diffs = pairwise_distance(u) - pairwise_distance(v)                       # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
-        bfact_sums = pairwise_sums_bfactors_tensorflow(bfactors)
-        bfact_norms = np.divide(diffs, 1) #EVENTUALLY DIVIDE BY BFACT_SUMS
-        norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
+        bfact_sums = remove_zeros(pairwise_sums_bfactors(bfactors))
+
+        bfact_norms = np.divide(diffs, bfact_sums)
+        norms, reduce_sum = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 
         return norms, diffs, udiffs, vdiffs, bfactors, bfact_sums
 
@@ -291,34 +294,20 @@ def pairwise_distance(u, name=None):
         expand = tf.expand_dims(u, 1)
         
         diffs = u - expand                               # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
-        norms = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
+        norms, reduce_sum = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
 
-        return norms, expand, diffs
+        return norms, reduce_sum, diffs
 
-def pairwise_sums_bfactors_tensorflow(bfactors):
-
-    #shape = tf.size(bfactors)
-    #shape = bfactors.get_shape().as_list()
+def pairwise_sums_bfactors(bfactors):
     bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
-    expand = tf.expand_dims(bfactors, 1)
+    newlist = []
+    for i in range(bfactors.shape[0]):
+        newlist.append(bfactors[i][0:])
+    newlist_tensor = tf.convert_to_tensor(newlist)
+    transpose = tf.transpose(newlist_tensor)
+    expand = tf.expand_dims(transpose, 1)
+    sums = transpose + expand
+    return sums
 
-    #bfact_tile = tf.tile(bfactors, [2, 1])
-    #bfact_sums = tf.transpose(bfact_tile, perm=[1, 0])
-    return expand
-
-#def pairwise_sums_bfactors():
-#    bfact_sums = []
-#    for protein in saved_bfactors:
-#        sums = []
-#        for bfactor1 in protein:
-#            bfactor1sums = []
-#            for bfactor2 in protein:
-#                sum = bfactor1 + bfactor2
-#                bfactor1sums.append(sum)
-#            sums.append(bfactor1sums)
-#        bfact_sums.append(sums)
-#    return bfact_sums
-
-#def save_bfactors(bfactors):
-#    global saved_bfactors
-#    saved_bfactors = bfactors
+def remove_zeros(bfact_sums):
+    return tf.where(tf.equal(bfact_sums, 0), tf.ones_like(bfact_sums), bfact_sums)

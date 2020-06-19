@@ -60,7 +60,6 @@ class RGNModel(object):
             else:
                 self.evaluate = self._evaluate
                 self.predict  = self._predict
-
             # process config for derived properties
             io = self.config.io
             arch = self.config.architecture
@@ -1091,7 +1090,8 @@ def _drmsds(config, coordinates, targets, bfactors, weights):
     if config['atoms'] == 'c_alpha': # starts at 1 because c_alpha atoms are the second atoms
         coordinates = coordinates[1::NUM_DIHEDRALS] # [NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE, NUM_DIMENSIONS]
         targets     =     targets[1::NUM_DIHEDRALS] # [NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE, NUM_DIMENSIONS]
-                  
+        bfactors    =    bfactors[:, 1::NUM_DIHEDRALS]
+
     # compute per structure dRMSDs
     drmsds, diffs, u, v, bfactors_2, bfact_sums = drmsd(coordinates, targets, bfactors, weights, name='drmsds') # [BATCH_SIZE]
 
