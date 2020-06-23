@@ -217,14 +217,14 @@ class RGNModel(object):
 
                 # Convert dihedrals into full 3D structures and compute dRMSDs
                 coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
-                drmsds, diffs, u, v, bfactors_2, bfact_sums = _drmsds(merge_dicts(config.optimization, config.loss, config.io), coordinates, tertiaries, bfactors, weights)
+                useBFactors = config.optimization['use_b_factors']
+                drmsds, diffs, u, v, bfactors_2 = _drmsds(merge_dicts(config.optimization, config.loss, config.io), coordinates, tertiaries, bfactors, useBFactors, weights)
 
                 #Return tensors to be printed.
                 self.ret_diffs = diffs
                 self.ret_u = u
                 self.ret_v = v
                 self.ret_bfactors_2 = bfactors_2
-                self.ret_bfact_sums = bfact_sums
                 self.ret_norms = drmsds
 
                 if mode == 'evaluation': 
@@ -486,7 +486,6 @@ class RGNModel(object):
             self.dflow_u = self._dflow_u
             self.dflow_v = self._dflow_v
             self.dflow_bfactors_2 = self._dflow_bfactors_2
-            self.dflow_bfact_sums = self._dflow_bfact_sums
 
             del self.start
 
@@ -542,9 +541,6 @@ class RGNModel(object):
 
     def _dflow_bfactors_2(self, session):
         return session.run(self.ret_bfactors_2)
-
-    def _dflow_bfact_sums(self, session):
-        return session.run(self.ret_bfact_sums)
 
     def _bfactors_to_array(self, bfactors):
         return
@@ -1082,7 +1078,7 @@ def _coordinates(config, dihedrals):
 
     return coordinates
 
-def _drmsds(config, coordinates, targets, bfactors, weights):
+def _drmsds(config, coordinates, targets, bfactors, useBFactors, weights):
     """ Computes reduced weighted dRMSD loss (as specified by weights) 
         between predicted tertiary structures and targets. """
 
@@ -1097,12 +1093,12 @@ def _drmsds(config, coordinates, targets, bfactors, weights):
         bfactors    =    bfactors[:, 1::NUM_DIHEDRALS]
 
     # compute per structure dRMSDs
-    drmsds, diffs, u, v, bfactors_2, bfact_sums = drmsd(coordinates, targets, bfactors, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds, diffs, u, v, bfactors_2 = drmsd(coordinates, targets, bfactors, useBFactors, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)
 
-    return drmsds, diffs, u, v, bfactors_2, bfact_sums
+    return drmsds, diffs, u, v, bfactors_2
 
 def _reduce_loss_quotient(config, losses, masks, group_filter, name_prefix=''):
     """ Reduces loss according to normalization order. """

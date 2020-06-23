@@ -111,7 +111,8 @@ class RGNConfig(Config):
                              'alphabet_temperature':      float(config.get('alphabetTemperature',  1.0)),
                              'batch_size':                  int(config.get('batchSize',            256)),
                              'num_steps':                   int(config.get('maxSeqLength',         500)),   # Longer seqs removed, shorter ones padded. Max irrespective of curriculum
-                             'num_epochs':          int_or_none(config.get('numEpochs',            None))}
+                             'num_epochs':          int_or_none(config.get('numEpochs',            None)),
+                             'use_b_factors':       str_or_bool(config.get('useBFactors',          True))}
 
         # queueing
         self.queueing = {'file_queue_capacity':        int(config.get('fileQueueCapacity',        1000)),  # Defaults make sense if each file has ~100 sequences

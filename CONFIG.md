@@ -83,6 +83,7 @@ All keep probabilities correspond to 1 - dropout probability, and can be specifi
 | alphabetTemperature | real between 0 and 1 | temperature of alphabet softmax |
 | numEpochs | integer | number of epochs to train for |
 | validationMilestone | {iteration:drmsd, ...} | dictionary of (validation) dRMSDs that must be reached by corresponding iterations, otherwise training is restarted with a new seed |
+| useBFactors | boolean | if True use bfactors in loss function |
 
 ## Initialization
 Many initialization options accept an initialization dictionary of the form `{'base': spec, 'bias': spec}`, where `'base'` controls the overall distribution and `'bias'` the bias terms, and `spec` is of the form `{'center': real, 'range': real, 'dist': <dist>}` where ``<dist>`` can be one of `'gaussian'`, `'uniform'`, `'orthogonal'`, `'gaussian_variance_scaling'`, and `'uniform_variance_scaling'`. Additional `spec` terms may be specifiable for some distributions.
