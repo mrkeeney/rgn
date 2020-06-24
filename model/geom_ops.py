@@ -32,8 +32,6 @@ NUM_DIHEDRALS = 3
 BOND_LENGTHS = np.array([145.801, 152.326, 132.868], dtype='float32')
 BOND_ANGLES  = np.array([  2.124,   1.941,   2.028], dtype='float32')
 
-saved_bfactors = []
-
 # Functions
 def angularize(input_tensor, name=None):
     """ Restricts real-valued tensors to the interval [-pi, pi] by feeding them through a cosine. """

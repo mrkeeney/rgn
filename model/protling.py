@@ -388,7 +388,6 @@ def loop(args):
     #bfactors_print = models['training'].dflow_bfactors(session)
     #print("bfactors:")
     #print(bfactors_print)
-    #save_bfactors(bfactors_print)
 
     #primaries_print = models['training'].dflow_primaries(session)
     #print("primaries:")
