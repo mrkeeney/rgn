@@ -42,17 +42,17 @@ class DeadGradientError(RuntimeError):
     pass
 
 # logging functions
-def evaluate_and_log(log_file, configs, models, session):
+def evaluate_and_log(log_file, configs, models, session, ids, grads, grads_and_vars, vars_):
     # evaluation of weighted losses
     wt_train_loss_dict = models['eval_wt_train'].evaluate(session) if configs['run'].evaluation['include_weighted_training']   else {}
     wt_val_loss_dict   = models['eval_wt_val'].evaluate(session)   if configs['run'].evaluation['include_weighted_validation'] else {}
     wt_test_loss_dict  = models['eval_wt_test'].evaluate(session)  if configs['run'].evaluation['include_weighted_testing']    else {}
 
     # diagnostics
-    if configs['run'].evaluation['include_diagnostics']: 
+    if configs['run'].evaluation['include_diagnostics']:
         diagnostics = models['training'].diagnose(session)
     else:
-        diagnostics = {k: float('nan') for k in ('min_weight', 'max_weight', 'min_grad', 'max_grad', 
+        diagnostics = {k: float('nan') for k in ('min_weight', 'max_weight', 'min_grad', 'max_grad',
                                                  'curriculum_step', 'curriculum_quantiles')}
 
     # Retrieve the correct loss.
@@ -92,54 +92,66 @@ def evaluate_and_log(log_file, configs, models, session):
                ).format(global_step, wt_train_loss, wt_val_loss['tertiary_loss_all'], wt_test_loss, **merge_dicts(diagnostics, wt_val_loss))
     
     # Additional diagnostics and losses if there's a curriculum.
-    if configs['training'].curriculum['mode'] is not None:
-        # evaluation of unweighted losses
-        unwt_train_loss_dict = models['eval_unwt_train'].evaluate(session) if configs['run'].evaluation['include_unweighted_training']   else {}
-        unwt_val_loss_dict   = models['eval_unwt_val'].evaluate(session)   if configs['run'].evaluation['include_unweighted_validation'] else {}
-        unwt_test_loss_dict  = models['eval_unwt_test'].evaluate(session)  if configs['run'].evaluation['include_unweighted_testing']    else {}
+    # if configs['training'].curriculum['mode'] is not None:
+    # evaluation of unweighted losses
+    unwt_train_loss_dict = models['eval_unwt_train'].evaluate(session) if configs['run'].evaluation['include_unweighted_training']   else {}
+    unwt_val_loss_dict   = models['eval_unwt_val'].evaluate(session)   if configs['run'].evaluation['include_unweighted_validation'] else {}
+    unwt_test_loss_dict  = models['eval_unwt_test'].evaluate(session)  if configs['run'].evaluation['include_unweighted_testing']    else {}
 
-        # Retrieve the correct loss.
-        for loss_key in ['tertiary_loss_all']:
-            if loss_key in unwt_train_loss_dict:
-                unwt_train_loss = unwt_train_loss_dict[loss_key]
-                break
-        else:
-            unwt_train_loss = float('nan')
-
-        if configs['run'].evaluation['include_unweighted_validation']:
-            unwt_val_loss = {}
-            for loss_type in ['tertiary_loss', 'min_tertiary_loss_achieved']:
-                for subgroup in ['all'] + configs['eval_unwt_val'].io['evaluation_sub_groups']:
-                    loss_key = loss_type + '_' + subgroup
-                    unwt_val_loss.update({loss_key: unwt_val_loss_dict.get(loss_key, float('nan'))})
-            unwt_val_loss_subgroups_string = ''.join(map(lambda grp: '\tUnweighted Validation_' + grp + ': {tertiary_loss_' + grp + ':.3f}', 
-                                                         configs['eval_unwt_val'].io['evaluation_sub_groups']))
-        else:
-            unwt_val_loss = {'tertiary_loss_all': float('nan')}
-            unwt_val_loss_subgroups_string = ''
-
-        for loss_key in ['tertiary_loss_all']:
-            if loss_key in unwt_test_loss_dict:
-                unwt_test_loss   = unwt_test_loss_dict[loss_key]
-                break
-        else:
-            unwt_test_loss   = float('nan')
-
-        # Log string
-        extended_log = ('\tCurriculum Iteration: {curriculum_step:.3f}\t' + \
-                        'Unweighted Train: {0:.3f}\t' + \
-                        'Unweighted Validation: {1:.3f}\t' + \
-                        'Unweighted Test: {2:.3f}\t' + \
-                        'Curriculum Quantile: {curriculum_quantiles}' + \
-                        unwt_val_loss_subgroups_string
-                       ).format(unwt_train_loss, unwt_val_loss['tertiary_loss_all'], unwt_test_loss, **merge_dicts(diagnostics, unwt_val_loss))
+    # Retrieve the correct loss.
+    for loss_key in ['tertiary_loss_all']:
+        if loss_key in unwt_train_loss_dict:
+            unwt_train_loss = unwt_train_loss_dict[loss_key]
+            break
     else:
-        extended_log = ''
+        unwt_train_loss = float('nan')
+
+    if configs['run'].evaluation['include_unweighted_validation']:
+        unwt_val_loss = {}
+        for loss_type in ['tertiary_loss', 'min_tertiary_loss_achieved']:
+            for subgroup in ['all'] + configs['eval_unwt_val'].io['evaluation_sub_groups']:
+                loss_key = loss_type + '_' + subgroup
+                unwt_val_loss.update({loss_key: unwt_val_loss_dict.get(loss_key, float('nan'))})
+        unwt_val_loss_subgroups_string = ''.join(map(lambda grp: '\tUnweighted Validation_' + grp + ': {tertiary_loss_' + grp + ':.3f}',
+                                                     configs['eval_unwt_val'].io['evaluation_sub_groups']))
+    else:
+        unwt_val_loss = {'tertiary_loss_all': float('nan')}
+        unwt_val_loss_subgroups_string = ''
+
+    for loss_key in ['tertiary_loss_all']:
+        if loss_key in unwt_test_loss_dict:
+            unwt_test_loss   = unwt_test_loss_dict[loss_key]
+            break
+    else:
+        unwt_test_loss   = float('nan')
+
+    # Log string
+    # extended_log = ('\tCurriculum Iteration: {curriculum_step:.3f}\t' + \
+    #                 'Unweighted Train: {0:.3f}\t' + \
+    #                 'Unweighted Validation: {1:.3f}\t' + \
+    #                 'Unweighted Test: {2:.3f}\t' + \
+    #                 'Curriculum Quantile: {curriculum_quantiles}' + \
+    #                 unwt_val_loss_subgroups_string
+    #                ).format(unwt_train_loss, unwt_val_loss['tertiary_loss_all'], unwt_test_loss, **merge_dicts(diagnostics, unwt_val_loss))
+
+    extended_log = ('\tUnweighted Train: {0:.3f}\t' + \
+                    'Unweighted Validation: {1:.3f}\t'
+                    ).format(unwt_train_loss, unwt_val_loss['tertiary_loss_all'])
+
+    # else:
+    #     extended_log = ''
+
+    grad_logging = ""
+    for i, g in enumerate(vars_):
+        grad_logging += str(g.shape) + "\n"
+        grad_logging += np.array_str(g) + "\n"
+        with open(log_file + str(i), 'a') as f: f.write(base_log + extended_log + '\n' + str(ids) + '\n' + str(grad_logging) + '\n')
 
     # Log to disk
-    with open(log_file, 'a') as f: f.write(base_log + extended_log + '\n')
+    # with open(log_file, 'a') as f: f.write(base_log + extended_log + '\n' + str(ids) + '\n' + grad_logging + '\n')
+    # with open(log_file, 'a') as f: f.write(base_log + extended_log + '\n' + str(ids) + '\n' + grads + '\n'+ str(len(grads)) + '\n' + str(type(grads)) + '\n')
 
-    if 'alphabet' in diagnostics: 
+    if 'alphabet' in diagnostics:
         with open(log_file + '.alphabet', 'a') as f:
             np.savetxt(f, diagnostics['alphabet'], footer='\n')
 
@@ -340,41 +352,41 @@ def loop(args):
         pprint(configs['eval_wt_test'].__dict__)
 
     # create equivalents for unweighted loss if there's a curriculum.
-    if configs['training'].curriculum['mode'] is not None:
-        # create unweighted training evaluation model (conditional)
-        if configs['run'].evaluation['include_unweighted_training']:
-            configs.update({'eval_unwt_train': deepcopy(configs['evaluation'])})
-            configs['eval_unwt_train'].io['name'] = 'evaluation_unwt_training'
-            configs['eval_unwt_train'].io['data_files_glob'] = sample_training_glob
-            configs['eval_unwt_train'].optimization['batch_size'] = training_batch_size
-            configs['eval_unwt_train'].queueing['num_evaluation_invocations'] = training_invocations
-            configs['eval_unwt_train'].curriculum['mode'] = None
-            configs['eval_unwt_train'].curriculum['behavior'] = None
-            models.update({'eval_unwt_train': RGNModel('evaluation', configs['eval_unwt_train'])})
-        
-        # create unweighted validation evaluation model (conditional)
-        if configs['run'].evaluation['include_unweighted_validation']:
-            configs.update({'eval_unwt_val': deepcopy(configs['evaluation'])})
-            configs['eval_unwt_val'].io['name'] = 'evaluation_unwt_validation'
-            configs['eval_unwt_val'].io['data_files_glob'] = validation_glob
-            configs['eval_unwt_val'].optimization['batch_size'] = validation_batch_size
-            configs['eval_unwt_val'].queueing['num_evaluation_invocations'] = validation_invocations
-            configs['eval_unwt_val'].curriculum['mode'] = None
-            configs['eval_unwt_val'].curriculum['behavior'] = None
-            if configs['run'].optimization['validation_reference'] == 'unweighted': 
-                configs['eval_unwt_val'].curriculum['update_loss_history'] = True
-            models.update({'eval_unwt_val': RGNModel('evaluation', configs['eval_unwt_val'])})
+    # if configs['training'].curriculum['mode'] is not None:
+    # create unweighted training evaluation model (conditional)
+    if configs['run'].evaluation['include_unweighted_training']:
+        configs.update({'eval_unwt_train': deepcopy(configs['evaluation'])})
+        configs['eval_unwt_train'].io['name'] = 'evaluation_unwt_training'
+        configs['eval_unwt_train'].io['data_files_glob'] = sample_training_glob
+        configs['eval_unwt_train'].optimization['batch_size'] = training_batch_size
+        configs['eval_unwt_train'].queueing['num_evaluation_invocations'] = training_invocations
+        configs['eval_unwt_train'].curriculum['mode'] = None
+        configs['eval_unwt_train'].curriculum['behavior'] = None
+        models.update({'eval_unwt_train': RGNModel('evaluation', configs['eval_unwt_train'])})
 
-        # create unweighted testing evaluation model (conditional)
-        if configs['run'].evaluation['include_unweighted_testing']:
-            configs.update({'eval_unwt_test': deepcopy(configs['evaluation'])})
-            configs['eval_unwt_test'].io['name'] = 'evaluation_unwt_testing'
-            configs['eval_unwt_test'].io['data_files_glob'] = testing_glob
-            configs['eval_unwt_test'].optimization['batch_size'] = testing_batch_size
-            configs['eval_unwt_test'].queueing['num_evaluation_invocations'] = testing_invocations
-            configs['eval_unwt_test'].curriculum['mode'] = None
-            configs['eval_unwt_test'].curriculum['behavior'] = None
-            models.update({'eval_unwt_test': RGNModel('evaluation', configs['eval_unwt_test'])})
+    # create unweighted validation evaluation model (conditional)
+    if configs['run'].evaluation['include_unweighted_validation']:
+        configs.update({'eval_unwt_val': deepcopy(configs['evaluation'])})
+        configs['eval_unwt_val'].io['name'] = 'evaluation_unwt_validation'
+        configs['eval_unwt_val'].io['data_files_glob'] = validation_glob
+        configs['eval_unwt_val'].optimization['batch_size'] = validation_batch_size
+        configs['eval_unwt_val'].queueing['num_evaluation_invocations'] = validation_invocations
+        configs['eval_unwt_val'].curriculum['mode'] = None
+        configs['eval_unwt_val'].curriculum['behavior'] = None
+        if configs['run'].optimization['validation_reference'] == 'unweighted':
+            configs['eval_unwt_val'].curriculum['update_loss_history'] = True
+        models.update({'eval_unwt_val': RGNModel('evaluation', configs['eval_unwt_val'])})
+
+    # create unweighted testing evaluation model (conditional)
+    if configs['run'].evaluation['include_unweighted_testing']:
+        configs.update({'eval_unwt_test': deepcopy(configs['evaluation'])})
+        configs['eval_unwt_test'].io['name'] = 'evaluation_unwt_testing'
+        configs['eval_unwt_test'].io['data_files_glob'] = testing_glob
+        configs['eval_unwt_test'].optimization['batch_size'] = testing_batch_size
+        configs['eval_unwt_test'].queueing['num_evaluation_invocations'] = testing_invocations
+        configs['eval_unwt_test'].curriculum['mode'] = None
+        configs['eval_unwt_test'].curriculum['behavior'] = None
+        models.update({'eval_unwt_test': RGNModel('evaluation', configs['eval_unwt_test'])})
 
     # start head model and related prep
     stdout_err_file_handle.flush()
@@ -461,7 +473,7 @@ def loop(args):
         try:
             while not models['training'].is_done():
                 # Train for one step
-                global_step, ids = models['training'].train(session)
+                global_step, ids, grads, grads_and_vars, vars_ = models['training'].train(session)
 
                 # Set and create logging directory and files if needed
                 log_dir = os.path.join(run_dir, str((global_step // configs['run'].io['prediction_frequency']) + 1))
@@ -470,7 +482,7 @@ def loop(args):
 
                 # Evaluate error, get diagnostics, and raise exceptions if necessary
                 if global_step % configs['run'].io['evaluation_frequency'] == 0:
-                    diagnostics = evaluate_and_log(log_file, configs, models, session)
+                    diagnostics = evaluate_and_log(log_file, configs, models, session, ids, grads, grads_and_vars, vars_)
 
                     # restart if a milestone is missed
                     val_ref_set_prefix = 'un' if configs['run'].optimization['validation_reference'] == 'unweighted' else ''

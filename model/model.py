@@ -284,13 +284,13 @@ class RGNModel(object):
             # Training
             if mode == 'training':
                 # get grads, training ops
-                self._global_step, minimize_op, grads_and_vars_dict = _training(config.optimization, loss)
+                self._global_step, minimize_op, grads_and_vars_dict, grads_only, vars_ = _training(config.optimization, loss)
                 self._grads_and_vars_length = len(grads_and_vars_dict) / 2
 
                 # update relevant op dicts
                 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
                 # if update_ops: training_ops.update({'update_ops': tf.tuple(update_ops)})
-                training_ops.update({'minimize_op': minimize_op, 'global_step': self._global_step, 'ids': ids})
+                training_ops.update({'minimize_op': minimize_op, 'global_step': self._global_step, 'ids': ids, 'grads_only': grads_only, 'grads_and_vars': grads_and_vars_dict, 'vars': vars_})
                 diagnostic_ops.update(grads_and_vars_dict)
 
             # Curriculum
@@ -303,7 +303,7 @@ class RGNModel(object):
 
         training_dict = ops_to_dict(session, self._training_ops)
 
-        return training_dict['global_step'], training_dict['ids']
+        return training_dict['global_step'], training_dict['ids'], training_dict['grads_only'], training_dict['grads_and_vars'], training_dict['vars']
 
     def _evaluate(self, session, pretty=True):
         """ Evaluates loss(es) and returns dicts with the relevant loss(es). """
@@ -1184,6 +1184,7 @@ def _training(config, loss):
 
     # obtain and process gradients
     grads_and_vars = optimizer.compute_gradients(loss)
+    grads_only = [g for g, _ in grads_and_vars]
     threshold = config['gradient_threshold']
 
     if threshold != float('inf'):
@@ -1204,7 +1205,7 @@ def _training(config, loss):
     grads_and_vars_dict.update({('g' + str(i)): g for i, (g, _) in enumerate(grads_and_vars)})
     grads_and_vars_dict.update({('v' + str(i)): v for i, (_, v) in enumerate(grads_and_vars)})
 
-    return global_step, minimize_op, grads_and_vars_dict
+    return global_step, minimize_op, grads_and_vars_dict, grads_only, [v for _, v in grads_and_vars]
 
 def _history(config, loss, loss_history=None, scaling_factor=LOSS_SCALING_FACTOR):
     """ Creates op for loss history updating. """
