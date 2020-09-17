@@ -97,8 +97,6 @@ def reduce_l2_norm(input_tensor, reduction_indices=None, keep_dims=None, weights
         input_tensor_sq = tf.square(input_tensor)
         if weights is not None: input_tensor_sq = input_tensor_sq * weights
 
-        reduce_sum = tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims)
-
         return tf.sqrt(tf.maximum(tf.reduce_sum(input_tensor_sq, axis=reduction_indices, keep_dims=keep_dims), epsilon), name=scope)
 
 def reduce_l1_norm(input_tensor, reduction_indices=None, keep_dims=None, weights=None, nonnegative=True, name=None):
