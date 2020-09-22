@@ -263,17 +263,24 @@ def drmsd(u, v, bfactors, useBFactors, weights, name=None):
         #Calculate the difference in pairwise distances for target coordinates and known coordinates.
         diffs = pairwise_distance(u) - pairwise_distance(v)                       # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
 
-        if useBFactors == True:
-            #Calculate the pairwise sums of bfactors that correspond to the pairwise distances for target and known coordinates.
+        norms_no_b = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name='dRMSD_no_b')
+        with open('norms_no_b.txt', 'a') as f:
+            f.write(str(type(norms_no_b)) + "\n")
+            f.write(str(tf.shape(norms_no_b)) + "\n")
+            f.write(str(type(scope)) + "\n")
+            f.write(str(scope) + "\n")
+
+        if useBFactors:
+            # Calculate the pairwise sums of bfactors that correspond to the pairwise distances for target and known coordinates.
             bfact_sums = remove_zeros(pairwise_sums_bfactors(bfactors))
 
-            #Divide the pairwise distances by the bfactor pairwise sums.
+            # Divide the pairwise distances by the bfactor pairwise sums.
             bfact_norms = np.divide(diffs, bfact_sums)
             norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
         else:
             norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 
-        return norms, diffs, u, v, bfactors
+        return norms, diffs, u, v, bfactors, norms_no_b
 
 def pairwise_distance(u, name=None):
     """ Computes the pairwise distance (l2 norm) between all vectors in the tensor.

@@ -218,17 +218,20 @@ class RGNModel(object):
                 # Convert dihedrals into full 3D structures and compute dRMSDs
                 coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
                 useBFactors = config.optimization['use_b_factors']
-                drmsds, diffs, u, v, bfactors_2 = _drmsds(merge_dicts(config.optimization, config.loss, config.io), coordinates, tertiaries, bfactors, useBFactors, weights)
+                drmsds, diffs, u, v, bfactors_2, drmsds_no_b = _drmsds(merge_dicts(config.optimization, config.loss, config.io),
+                                                                       coordinates, tertiaries, bfactors, useBFactors, weights)
 
-                #Return tensors to be printed.
+                # Return tensors to be printed.
                 self.ret_diffs = diffs
                 self.ret_u = u
                 self.ret_v = v
                 self.ret_bfactors_2 = bfactors_2
-                self.ret_norms = drmsds
+                # self.ret_norms = drmsds
 
                 if mode == 'evaluation': 
                     prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
+
+            losses_filtered = None
 
             # Losses
             if config.loss['include']:
@@ -239,14 +242,20 @@ class RGNModel(object):
                     with tf.variable_scope(group_id):
                         # Tertiary loss
                         effective_tertiary_loss = 0.
+                        effective_tertiary_loss_no_b = 0.
                         if config.loss['tertiary_weight'] > 0:
                             if config.queueing['num_evaluation_invocations'] > 1 and mode == 'training':
                                 raise RuntimeError('Cannot use multiple invocations with training mode.')
                             else:
+                                what_is_happening = drmsds
                                 # Compute tertiary loss quotient parts by reducing dRMSDs based on normalization behavior
-                                tertiary_loss_numerator, tertiary_loss_denominator = _reduce_loss_quotient(merge_dicts(config.loss, config.io, config.optimization), 
-                                                                                                           drmsds, masks, group_filter, 
+                                tertiary_loss_numerator, tertiary_loss_denominator, losses_filtered, confused = _reduce_loss_quotient(merge_dicts(config.loss, config.io, config.optimization),
+                                                                                                           drmsds, masks, group_filter,
                                                                                                            name_prefix='tertiary_loss')
+
+                                tertiary_loss_numerator_no_b, tertiary_loss_denominator_no_b, losses_filtered_no_b, confused_no_b = _reduce_loss_quotient(merge_dicts(config.loss, config.io, config.optimization),
+                                                                                                           drmsds_no_b, masks, group_filter,
+                                                                                                           name_prefix='tertiary_loss_no_b')
 
                                 # Handles multiple invocations and gracefully degrades for single invocations.
                                 # Variables are created below _per_ evaluation model, which is a deviation from my general design
@@ -256,18 +265,30 @@ class RGNModel(object):
                                                                                                  tertiary_loss_numerator, tertiary_loss_denominator,
                                                                                                  name_prefix='tertiary_loss')
 
+                                tertiary_loss_no_b, min_loss_achieved_no_b, min_loss_op_no_b, update_accu_op_no_b, reduce_accu_op_no_b = _accumulate_loss(
+                                                                                                merge_dicts(config.io, config.queueing),
+                                                                                                tertiary_loss_numerator_no_b, tertiary_loss_denominator_no_b,
+                                                                                                name_prefix='tertiary_loss_no_b')
+
                                 if mode == 'evaluation':
                                     evaluation_ops.update(     {'update_accumulator_'         + group_id + '_op': update_accu_op})
                                     last_evaluation_ops.update({'tertiary_loss_'              + group_id        : tertiary_loss * LOSS_SCALING_FACTOR, \
+                                                                'tertiary_loss_no_b_'         + group_id        : tertiary_loss_no_b * LOSS_SCALING_FACTOR, \
                                                                 'reduce_accumulator_'         + group_id + '_op': reduce_accu_op, \
                                                                 'min_tertiary_loss_achieved_' + group_id        : min_loss_achieved * LOSS_SCALING_FACTOR, \
                                                                 'min_tertiary_loss_'          + group_id + '_op': min_loss_op})
 
                             if config.io['log_model_summaries']: tf.add_to_collection(config.io['name'] + '_tertiary_losses', tertiary_loss)
                             effective_tertiary_loss = config.loss['tertiary_weight'] * tertiary_loss
+                            effective_tertiary_loss_no_b = config.loss['tertiary_weight'] * tertiary_loss_no_b
+                            # with open('effective_tertiary_no_b.txt', 'a') as f:
+                            #     f.write(str(type(effective_tertiary_loss_no_b)) + "\n")
+                            #     f.write(str(tf.shape(effective_tertiary_loss_no_b)) + "\n")
+                            #     f.write("Loss (no B-factors): " + str(effective_tertiary_loss_no_b) + "\n")
 
                         # Final loss and related housekeeping
                         loss = tf.identity(effective_tertiary_loss, name='loss')
+                        loss_no_b = tf.identity(effective_tertiary_loss_no_b, name='loss_no_b')
                         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) # batch_norm related
                         if update_ops: loss = control_flow_ops.with_dependencies(tf.tuple(update_ops), loss)
                         if config.io['log_model_summaries']: tf.add_to_collection(config.io['name'] + '_losses', loss)
@@ -279,7 +300,12 @@ class RGNModel(object):
                                               shape=[config.curriculum['change_num_iterations']], trainable=False, name='curriculum_loss_history')
                 if mode == 'evaluation' and config.curriculum['update_loss_history']:
                     update_curriculum_history_op = _history(config.io, curriculum_loss, curriculum_loss_history)
-                    last_evaluation_ops.update({'update_curriculum_history_op': update_curriculum_history_op})
+                    last_evaluation_ops.update({'update,_curriculum_history_op': update_curriculum_history_op})
+
+            self.ret_norms = (drmsds, drmsds_no_b)
+            self.ret_losses = (group_filter, losses_filtered, confused, what_is_happening, tertiary_loss_numerator,
+                               tertiary_loss_denominator, tertiary_loss, effective_tertiary_loss, loss,
+                               tf.convert_to_tensor(config.loss['tertiary_weight']), num_stepss)
 
             # Training
             if mode == 'training':
@@ -290,7 +316,9 @@ class RGNModel(object):
                 # update relevant op dicts
                 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
                 # if update_ops: training_ops.update({'update_ops': tf.tuple(update_ops)})
-                training_ops.update({'minimize_op': minimize_op, 'global_step': self._global_step, 'ids': ids, 'grads_only': grads_only, 'grads_and_vars': grads_and_vars_dict, 'vars': vars_})
+                training_ops.update({'minimize_op': minimize_op, 'global_step': self._global_step, 'ids': ids,
+                                     'grads_only': grads_only, 'grads_and_vars': grads_and_vars_dict, 'vars': vars_,
+                                     'loss_no_b': loss_no_b, 'loss_with_b': loss})
                 diagnostic_ops.update(grads_and_vars_dict)
 
             # Curriculum
@@ -302,8 +330,10 @@ class RGNModel(object):
         """ Performs one iteration of training and, if applicable, advances the curriculum. """
 
         training_dict = ops_to_dict(session, self._training_ops)
+        with open("training.txt","a") as f: f.write("training\n")
 
-        return training_dict['global_step'], training_dict['ids'], training_dict['grads_only'], training_dict['grads_and_vars'], training_dict['vars']
+        return training_dict['global_step'], training_dict['ids'], training_dict['grads_only'], \
+               training_dict['grads_and_vars'], training_dict['vars'], training_dict['loss_no_b'], training_dict['loss_with_b']
 
     def _evaluate(self, session, pretty=True):
         """ Evaluates loss(es) and returns dicts with the relevant loss(es). """
@@ -486,6 +516,8 @@ class RGNModel(object):
             self.dflow_u = self._dflow_u
             self.dflow_v = self._dflow_v
             self.dflow_bfactors_2 = self._dflow_bfactors_2
+            self.dflow_norms = self._dflow_norms
+            self.dflow_losses = self._dflow_losses
 
             del self.start
 
@@ -541,6 +573,12 @@ class RGNModel(object):
 
     def _dflow_bfactors_2(self, session):
         return session.run(self.ret_bfactors_2)
+
+    def _dflow_norms(self, session):
+        return session.run(self.ret_norms)
+
+    def _dflow_losses(self, session):
+        return session.run(self.ret_losses)
 
     def _bfactors_to_array(self, bfactors):
         return
@@ -1093,12 +1131,12 @@ def _drmsds(config, coordinates, targets, bfactors, useBFactors, weights):
         bfactors    =    bfactors[:, 1::NUM_DIHEDRALS]
 
     # compute per structure dRMSDs
-    drmsds, diffs, u, v, bfactors_2 = drmsd(coordinates, targets, bfactors, useBFactors, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds, diffs, u, v, bfactors_2, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)
 
-    return drmsds, diffs, u, v, bfactors_2
+    return drmsds, diffs, u, v, bfactors_2, drmsds_no_b
 
 def _reduce_loss_quotient(config, losses, masks, group_filter, name_prefix=''):
     """ Reduces loss according to normalization order. """
@@ -1128,7 +1166,7 @@ def _reduce_loss_quotient(config, losses, masks, group_filter, name_prefix=''):
     else:
         denominator = tf.multiply(tf.cast(tf.size(loss_factors), tf.float32), fixed_denominator_factor, name=name_prefix + '_denominator')
 
-    return numerator, denominator
+    return numerator, denominator, losses_filtered, losses
 
 def _accumulate_loss(config, numerator, denominator, name_prefix=''):
     """ Constructs ops to accumulate and reduce loss and maintain a memory of lowest loss achieved """
@@ -1199,6 +1237,8 @@ def _training(config, loss):
     # apply gradients and return stepping op
     global_step = tf.get_variable(initializer=tf.constant_initializer(0), shape=[], trainable=False, dtype=tf.int32, name='global_step')
     minimize_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
+    # with open("applied_grads.txt", "a") as f:
+    #     f.write("applying grads\n")
 
     # dict useful for diagnostics
     grads_and_vars_dict = {}
