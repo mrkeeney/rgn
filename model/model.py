@@ -293,7 +293,7 @@ class RGNModel(object):
                                               shape=[config.curriculum['change_num_iterations']], trainable=False, name='curriculum_loss_history')
                 if mode == 'evaluation' and config.curriculum['update_loss_history']:
                     update_curriculum_history_op = _history(config.io, curriculum_loss, curriculum_loss_history)
-                    last_evaluation_ops.update({'update,_curriculum_history_op': update_curriculum_history_op})
+                    last_evaluation_ops.update({'update_curriculum_history_op': update_curriculum_history_op})
 
             # Training
             if mode == 'training':
