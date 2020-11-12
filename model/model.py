@@ -230,8 +230,6 @@ class RGNModel(object):
                 if mode == 'evaluation': 
                     prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
 
-            losses_filtered = None
-
             # Losses
             if config.loss['include']:
                 filters = {grp: id_filter(ids, grp) for grp in config.io['evaluation_sub_groups']} if mode == 'evaluation' else {}
@@ -246,13 +244,12 @@ class RGNModel(object):
                             if config.queueing['num_evaluation_invocations'] > 1 and mode == 'training':
                                 raise RuntimeError('Cannot use multiple invocations with training mode.')
                             else:
-                                what_is_happening = drmsds
                                 # Compute tertiary loss quotient parts by reducing dRMSDs based on normalization behavior
-                                tertiary_loss_numerator, tertiary_loss_denominator, losses_filtered, confused = _reduce_loss_quotient(merge_dicts(config.loss, config.io, config.optimization),
+                                tertiary_loss_numerator, tertiary_loss_denominator = _reduce_loss_quotient(merge_dicts(config.loss, config.io, config.optimization),
                                                                                                            drmsds, masks, group_filter,
                                                                                                            name_prefix='tertiary_loss')
 
-                                tertiary_loss_numerator_no_b, tertiary_loss_denominator_no_b, losses_filtered_no_b, confused_no_b = _reduce_loss_quotient(merge_dicts(config.loss, config.io, config.optimization),
+                                tertiary_loss_numerator_no_b, tertiary_loss_denominator_no_b = _reduce_loss_quotient(merge_dicts(config.loss, config.io, config.optimization),
                                                                                                            drmsds_no_b, masks, group_filter,
                                                                                                            name_prefix='tertiary_loss_no_b')
 
@@ -1148,7 +1145,7 @@ def _reduce_loss_quotient(config, losses, masks, group_filter, name_prefix=''):
     else:
         denominator = tf.multiply(tf.cast(tf.size(loss_factors), tf.float32), fixed_denominator_factor, name=name_prefix + '_denominator')
 
-    return numerator, denominator, losses_filtered, losses
+    return numerator, denominator
 
 def _accumulate_loss(config, numerator, denominator, name_prefix=''):
     """ Constructs ops to accumulate and reduce loss and maintain a memory of lowest loss achieved """
