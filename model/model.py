@@ -180,10 +180,10 @@ class RGNModel(object):
             ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, num_stepss = _dataflow(dataflow_config, max_length)
 
             #Return tensors to be printed.
-            self.ret_numsteps = num_stepss
-            self.ret_bfactors = bfactors
-            self.ret_primaries = primaries
-            self.ret_tertiaries = tertiaries
+            # self.ret_numsteps = num_stepss
+            # self.ret_bfactors = bfactors
+            # self.ret_primaries = primaries
+            # self.ret_tertiaries = tertiaries
 
             # Set up inputs
             inputs = _inputs(merge_dicts(config.architecture, config.initialization), primaries, evolutionaries)
@@ -222,11 +222,10 @@ class RGNModel(object):
                                                                        coordinates, tertiaries, bfactors, useBFactors, weights)
 
                 # Return tensors to be printed.
-                self.ret_diffs = diffs
-                self.ret_u = u
-                self.ret_v = v
-                self.ret_bfactors_2 = bfactors_2
-                # self.ret_norms = drmsds
+                # self.ret_diffs = diffs
+                # self.ret_u = u
+                # self.ret_v = v
+                # self.ret_bfactors_2 = bfactors_2
 
                 if mode == 'evaluation': 
                     prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
@@ -276,15 +275,12 @@ class RGNModel(object):
                                                                 'tertiary_loss_no_b_'         + group_id        : tertiary_loss_no_b * LOSS_SCALING_FACTOR, \
                                                                 'reduce_accumulator_'         + group_id + '_op': reduce_accu_op, \
                                                                 'min_tertiary_loss_achieved_' + group_id        : min_loss_achieved * LOSS_SCALING_FACTOR, \
+                                                                'min_tertiary_loss_achieved_no_b_' + group_id: min_loss_achieved_no_b * LOSS_SCALING_FACTOR, \
                                                                 'min_tertiary_loss_'          + group_id + '_op': min_loss_op})
 
                             if config.io['log_model_summaries']: tf.add_to_collection(config.io['name'] + '_tertiary_losses', tertiary_loss)
                             effective_tertiary_loss = config.loss['tertiary_weight'] * tertiary_loss
                             effective_tertiary_loss_no_b = config.loss['tertiary_weight'] * tertiary_loss_no_b
-                            # with open('effective_tertiary_no_b.txt', 'a') as f:
-                            #     f.write(str(type(effective_tertiary_loss_no_b)) + "\n")
-                            #     f.write(str(tf.shape(effective_tertiary_loss_no_b)) + "\n")
-                            #     f.write("Loss (no B-factors): " + str(effective_tertiary_loss_no_b) + "\n")
 
                         # Final loss and related housekeeping
                         loss = tf.identity(effective_tertiary_loss, name='loss')
@@ -302,23 +298,16 @@ class RGNModel(object):
                     update_curriculum_history_op = _history(config.io, curriculum_loss, curriculum_loss_history)
                     last_evaluation_ops.update({'update,_curriculum_history_op': update_curriculum_history_op})
 
-            self.ret_norms = (drmsds, drmsds_no_b)
-            self.ret_losses = (group_filter, losses_filtered, confused, what_is_happening, tertiary_loss_numerator,
-                               tertiary_loss_denominator, tertiary_loss, effective_tertiary_loss, loss,
-                               tf.convert_to_tensor(config.loss['tertiary_weight']), num_stepss)
-
             # Training
             if mode == 'training':
                 # get grads, training ops
-                self._global_step, minimize_op, grads_and_vars_dict, grads_only, vars_ = _training(config.optimization, loss)
+                self._global_step, minimize_op, grads_and_vars_dict = _training(config.optimization, loss)
                 self._grads_and_vars_length = len(grads_and_vars_dict) / 2
 
                 # update relevant op dicts
                 # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
                 # if update_ops: training_ops.update({'update_ops': tf.tuple(update_ops)})
-                training_ops.update({'minimize_op': minimize_op, 'global_step': self._global_step, 'ids': ids,
-                                     'grads_only': grads_only, 'grads_and_vars': grads_and_vars_dict, 'vars': vars_,
-                                     'loss_no_b': loss_no_b, 'loss_with_b': loss})
+                training_ops.update({'minimize_op': minimize_op, 'global_step': self._global_step, 'ids': ids})
                 diagnostic_ops.update(grads_and_vars_dict)
 
             # Curriculum
@@ -330,10 +319,8 @@ class RGNModel(object):
         """ Performs one iteration of training and, if applicable, advances the curriculum. """
 
         training_dict = ops_to_dict(session, self._training_ops)
-        with open("training.txt","a") as f: f.write("training\n")
 
-        return training_dict['global_step'], training_dict['ids'], training_dict['grads_only'], \
-               training_dict['grads_and_vars'], training_dict['vars'], training_dict['loss_no_b'], training_dict['loss_with_b']
+        return training_dict['global_step'], training_dict['ids']
 
     def _evaluate(self, session, pretty=True):
         """ Evaluates loss(es) and returns dicts with the relevant loss(es). """
@@ -698,11 +685,6 @@ def _dataflow(config, max_length):
     bfactors       = tf.transpose(bfactors_batch_major,     perm=(0, 1), name='bfactors')
                      # b factors, i.e. experimental temperature factors.
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIMENSIONS, BATCH_SIZE]
-
-    #PRINT OUT SHAPES HERE.
-    #print("TERTIARIES SHAPE: ", tf.shape(tertiaries))
-    #print("PRIMARIES SHAPE: ", tf.shape(primaries))
-    #print("BFACTORS SHAPE: ", tf.shape(bfactors))
 
     # assign names to the nameless
     ids = tf.identity(ids, name='ids')
@@ -1237,15 +1219,13 @@ def _training(config, loss):
     # apply gradients and return stepping op
     global_step = tf.get_variable(initializer=tf.constant_initializer(0), shape=[], trainable=False, dtype=tf.int32, name='global_step')
     minimize_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
-    # with open("applied_grads.txt", "a") as f:
-    #     f.write("applying grads\n")
 
     # dict useful for diagnostics
     grads_and_vars_dict = {}
     grads_and_vars_dict.update({('g' + str(i)): g for i, (g, _) in enumerate(grads_and_vars)})
     grads_and_vars_dict.update({('v' + str(i)): v for i, (_, v) in enumerate(grads_and_vars)})
 
-    return global_step, minimize_op, grads_and_vars_dict, grads_only, [v for _, v in grads_and_vars]
+    return global_step, minimize_op, grads_and_vars_dict
 
 def _history(config, loss, loss_history=None, scaling_factor=LOSS_SCALING_FACTOR):
     """ Creates op for loss history updating. """

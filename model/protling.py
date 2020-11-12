@@ -45,7 +45,7 @@ class DeadGradientError(RuntimeError):
 
 
 # logging functions
-def evaluate_and_log(log_file, configs, models, session, ids, grads, grads_and_vars, vars_, loss_no_b, loss_with_b):
+def evaluate_and_log(log_file, configs, models, session):
     # evaluation of weighted losses
     wt_train_loss_dict = models['eval_wt_train'].evaluate(session) if configs['run'].evaluation[
         'include_weighted_training'] else {}
@@ -89,12 +89,14 @@ def evaluate_and_log(log_file, configs, models, session, ids, grads, grads_and_v
         wt_val_loss = {'tertiary_loss_all': float('nan')}
         wt_val_loss_subgroups_string = ''
 
-    for loss_key in ['tertiary_loss_no_b_all']:
-        if loss_key in wt_val_loss_dict:
-            wt_val_loss_no_b = wt_val_loss_dict[loss_key]
-            break
+    if configs['run'].evaluation['include_weighted_validation']:
+        wt_val_loss_no_b = {}
+        for loss_type in ['tertiary_loss_no_b', 'min_tertiary_loss_achieved_no_b']:
+            for subgroup in ['all']:
+                loss_key = loss_type + '_' + subgroup
+                wt_val_loss_no_b.update({loss_key: wt_val_loss_dict.get(loss_key, float('nan'))})
     else:
-        wt_val_loss_no_b = float('nan')
+        wt_val_loss_no_b = {'tertiary_loss_no_b_all': float('nan')}
 
     for loss_key in ['tertiary_loss_all']:
         if loss_key in wt_test_loss_dict:
@@ -118,7 +120,7 @@ def evaluate_and_log(log_file, configs, models, session, ids, grads, grads_and_v
                 'Update: {min_grad:.4e} {max_grad:.4e}' + \
                 wt_val_loss_subgroups_string
                 ).format(global_step, wt_train_loss, wt_val_loss['tertiary_loss_all'], wt_test_loss, wt_train_loss_no_b,
-                         wt_val_loss_no_b, wt_test_loss_no_b, **merge_dicts(diagnostics, wt_val_loss))
+                         wt_val_loss_no_b['tertiary_loss_no_b_all'], wt_test_loss_no_b, **merge_dicts(diagnostics, wt_val_loss))
 
     # Additional diagnostics and losses if there's a curriculum.
     # if configs['training'].curriculum['mode'] is not None:
@@ -158,41 +160,23 @@ def evaluate_and_log(log_file, configs, models, session, ids, grads, grads_and_v
     else:
         unwt_test_loss = float('nan')
 
-    # Log string
-    # extended_log = ('\tCurriculum Iteration: {curriculum_step:.3f}\t' + \
-    #                 'Unweighted Train: {0:.3f}\t' + \
-    #                 'Unweighted Validation: {1:.3f}\t' + \
-    #                 'Unweighted Test: {2:.3f}\t' + \
-    #                 'Curriculum Quantile: {curriculum_quantiles}' + \
-    #                 unwt_val_loss_subgroups_string
-    #                ).format(unwt_train_loss, unwt_val_loss['tertiary_loss_all'], unwt_test_loss, **merge_dicts(diagnostics, unwt_val_loss))
-
     extended_log = ('\tUnweighted Train: {0:.3f}\t' + \
                     'Unweighted Validation: {1:.3f}\t'
                     ).format(unwt_train_loss, unwt_val_loss['tertiary_loss_all'])
 
-    # else:
-    #     extended_log = ''
-
-    # no_b_logging = "Loss (no B-factors): " + str(loss_no_b) + "\n"
-    # no_b_logging += "Loss (with B-factors): " + str(loss_with_b) + "\n"
-
-    # for i, g in enumerate(vars_):
-    #     grad_logging += str(g.shape) + "\n"
-    #     grad_logging += np.array_str(g) + "\n"
-    #     with open(log_file + str(i), 'a') as f: f.write(base_log + extended_log + '\n' + str(ids) + '\n' + str(grad_logging) + '\n')
-
     # Log to disk
     with open(log_file, 'a') as f:
-        f.write(base_log + extended_log + '\n' + str(ids) + '\n')
-    # with open(log_file, 'a') as f: f.write(base_log + extended_log + '\n' + str(ids) + '\n' + grads + '\n'+ str(len(grads)) + '\n' + str(type(grads)) + '\n')
+        f.write(base_log + extended_log + '\n')
 
     if 'alphabet' in diagnostics:
         with open(log_file + '.alphabet', 'a') as f:
             np.savetxt(f, diagnostics['alphabet'], footer='\n')
 
     # prep return 'package'
-    diagnostics.update({'wt_train_loss': wt_train_loss, 'wt_val_loss': wt_val_loss, 'wt_test_loss': wt_test_loss})
+    diagnostics.update({'wt_train_loss': wt_train_loss,
+                        'wt_val_loss': wt_val_loss,
+                        'wt_test_loss': wt_test_loss,
+                        'wt_val_loss_no_b': wt_val_loss_no_b})
     if configs['training'].curriculum['mode'] is not None:
         diagnostics.update(
             {'unwt_train_loss': unwt_train_loss, 'unwt_val_loss': unwt_val_loss, 'unwt_test_loss': unwt_test_loss})
@@ -448,7 +432,7 @@ def loop(args):
     # print("num_stepss2:")
     # print(num_stepss2)
 
-    bfactors_print = models['training'].dflow_bfactors(session)
+    # bfactors_print = models['training'].dflow_bfactors(session)
     # print("bfactors:")
     # print(bfactors_print)
 
@@ -533,8 +517,7 @@ def loop(args):
         try:
             while not models['training'].is_done():
                 # Train for one step
-                global_step, ids, grads, grads_and_vars, vars_, loss_no_b, loss_with_b = models['training'].train(
-                    session)
+                global_step, ids = models['training'].train(session)
 
                 # Set and create logging directory and files if needed
                 log_dir = os.path.join(run_dir, str((global_step // configs['run'].io['prediction_frequency']) + 1))
@@ -543,14 +526,14 @@ def loop(args):
 
                 # Evaluate error, get diagnostics, and raise exceptions if necessary
                 if global_step % configs['run'].io['evaluation_frequency'] == 0:
-                    diagnostics = evaluate_and_log(log_file, configs, models, session, ids, grads,
-                                                   grads_and_vars, vars_, loss_no_b, loss_with_b)
+                    diagnostics = evaluate_and_log(log_file, configs, models, session)
 
                     # restart if a milestone is missed
                     val_ref_set_prefix = 'un' if configs['run'].optimization[
                                                      'validation_reference'] == 'unweighted' else ''
-                    min_loss_achieved = diagnostics[val_ref_set_prefix + 'wt_val_loss'][
-                        'min_tertiary_loss_achieved_all']
+                    # min_loss_achieved = diagnostics[val_ref_set_prefix + 'wt_val_loss'][
+                    min_loss_achieved = diagnostics[val_ref_set_prefix + 'wt_val_loss_no_b'][
+                        'min_tertiary_loss_achieved_no_b_all']
                     for step, loss in configs['run'].optimization['validation_milestone'].iteritems():
                         if global_step >= step and min_loss_achieved > loss:
                             raise MilestoneError('Milestone at step ' + str(global_step) + \
@@ -570,16 +553,6 @@ def loop(args):
                 # Checkpoint
                 if global_step % configs['run'].io['checkpoint_frequency'] == 0:
                     models['training'].save(session)
-
-                norms_print = models['training'].dflow_norms(session)
-                print("norms:")
-                print(norms_print)
-
-                losses_filtered_print = models['training'].dflow_losses(session)
-                print("losses_filtered:")
-                print(losses_filtered_print)
-
-                print(global_step)
 
         except tf.errors.OutOfRangeError as t:
             print t.message
