@@ -218,8 +218,9 @@ class RGNModel(object):
                 # Convert dihedrals into full 3D structures and compute dRMSDs
                 coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
                 useBFactors = config.optimization['use_b_factors']
+                useInverseJacobian = config.optimization['use_inverse_jacobian']
                 drmsds, diffs, u, v, bfactors_2, drmsds_no_b = _drmsds(merge_dicts(config.optimization, config.loss, config.io),
-                                                                       coordinates, tertiaries, bfactors, useBFactors, weights)
+                                                                       coordinates, tertiaries, bfactors, useBFactors, useInverseJacobian, weights)
 
                 # Return tensors to be printed.
                 # self.ret_diffs = diffs
@@ -1095,7 +1096,7 @@ def _coordinates(config, dihedrals):
 
     return coordinates
 
-def _drmsds(config, coordinates, targets, bfactors, useBFactors, weights):
+def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacobian, weights):
     """ Computes reduced weighted dRMSD loss (as specified by weights) 
         between predicted tertiary structures and targets. """
 
@@ -1110,7 +1111,7 @@ def _drmsds(config, coordinates, targets, bfactors, useBFactors, weights):
         bfactors    =    bfactors[:, 1::NUM_DIHEDRALS]
 
     # compute per structure dRMSDs
-    drmsds, diffs, u, v, bfactors_2, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds, diffs, u, v, bfactors_2, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)
