@@ -213,7 +213,6 @@ def predict_and_log(log_dir, configs, models, session):
                         if 'recurrent_states' in dict_:
                             np.savetxt(os.path.join(outputs_dir, idx + '.recurrent_states'), dict_['recurrent_states'])
 
-
 def loop(args):
     # create config and model collection objects, and retrieve the run config
     configs = {}

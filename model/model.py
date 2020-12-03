@@ -268,13 +268,16 @@ class RGNModel(object):
                                                                                                 name_prefix='tertiary_loss_no_b')
 
                                 if mode == 'evaluation':
-                                    evaluation_ops.update(     {'update_accumulator_'         + group_id + '_op': update_accu_op})
+                                    evaluation_ops.update(     {'update_accumulator_'         + group_id + '_op': update_accu_op,
+                                                                'update_accumulator_no_b_'         + group_id + '_op': update_accu_op_no_b})
                                     last_evaluation_ops.update({'tertiary_loss_'              + group_id        : tertiary_loss * LOSS_SCALING_FACTOR, \
                                                                 'tertiary_loss_no_b_'         + group_id        : tertiary_loss_no_b * LOSS_SCALING_FACTOR, \
                                                                 'reduce_accumulator_'         + group_id + '_op': reduce_accu_op, \
+                                                                'reduce_accumulator_no_b_'         + group_id + '_op': reduce_accu_op_no_b, \
                                                                 'min_tertiary_loss_achieved_' + group_id        : min_loss_achieved * LOSS_SCALING_FACTOR, \
-                                                                'min_tertiary_loss_achieved_no_b_' + group_id: min_loss_achieved_no_b * LOSS_SCALING_FACTOR, \
-                                                                'min_tertiary_loss_'          + group_id + '_op': min_loss_op})
+                                                                'min_tertiary_loss_achieved_no_b_' + group_id   : min_loss_achieved_no_b * LOSS_SCALING_FACTOR, \
+                                                                'min_tertiary_loss_'          + group_id + '_op': min_loss_op, \
+                                                                'min_tertiary_loss_no_b_'          + group_id + '_op': min_loss_op_no_b})
 
                             if config.io['log_model_summaries']: tf.add_to_collection(config.io['name'] + '_tertiary_losses', tertiary_loss)
                             effective_tertiary_loss = config.loss['tertiary_weight'] * tertiary_loss
