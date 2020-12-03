@@ -213,27 +213,6 @@ def predict_and_log(log_dir, configs, models, session):
                         if 'recurrent_states' in dict_:
                             np.savetxt(os.path.join(outputs_dir, idx + '.recurrent_states'), dict_['recurrent_states'])
 
-    # log_file = os.path.join(log_dir, 'predict.log')
-    # wt_test_loss_dict = models['eval_wt_test'].evaluate(session) if configs['run'].evaluation['include_weighted_testing'] else {}
-    
-    # for loss_key in ['tertiary_loss_all']:
-    #     if loss_key in wt_test_loss_dict:
-    #         wt_test_loss = wt_test_loss_dict[loss_key]
-    #         break
-    # else:
-    #     wt_test_loss = float('nan')
-
-    # for loss_key in ['tertiary_loss_no_b_all']:
-    #     if loss_key in wt_test_loss_dict:
-    #         wt_test_loss_no_b = wt_test_loss_dict[loss_key]
-    #         break
-    # else:
-    #     wt_test_loss_no_b = float('nan')
-
-    # base_log = ('Test: {:.3f}\t' + 'Test (no B-factors): {:.3f}\t').format(wt_test_loss, wt_test_loss_no_b)
-    # with open(log_file, 'a') as f:
-    #     f.write(base_log + '\n')
-
 def loop(args):
     # create config and model collection objects, and retrieve the run config
     configs = {}
