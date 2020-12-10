@@ -113,7 +113,8 @@ class RGNConfig(Config):
                              'num_steps':                   int(config.get('maxSeqLength',         500)),   # Longer seqs removed, shorter ones padded. Max irrespective of curriculum
                              'num_epochs':          int_or_none(config.get('numEpochs',            None)),
                              'use_b_factors':       str_or_bool(config.get('useBFactors',          True)),
-                             'use_inverse_jacobian': str_or_bool(config.get('useInverseJacobian',  False))}
+                             'use_inverse_jacobian': str_or_bool(config.get('useInverseJacobian',  False)),
+                             'predict_b_factors':    str_or_bool(config.get('predictBFactors',     False))}
 
         # queueing
         self.queueing = {'file_queue_capacity':        int(config.get('fileQueueCapacity',        1000)),  # Defaults make sense if each file has ~100 sequences

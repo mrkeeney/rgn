@@ -240,7 +240,7 @@ def point_to_coordinate(pt, num_fragments=6, parallel_iterations=4, swap_memory=
 
         return coords
 
-def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, weights, name=None):
+def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights, name=None):
     """ Computes the dRMSD of two tensors of vectors.
 
         Vectors are assumed to be in the third dimension. Op is done element-wise over batch.
@@ -251,6 +251,9 @@ def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, weights, name=None):
 
     Returns:
                  [BATCH_SIZE]
+
+                 u = predicted coordinates
+                 v = experimental coordinates
     """
 
     with tf.name_scope(name, 'dRMSD', [u, v, weights]) as scope:
@@ -279,6 +282,9 @@ def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, weights, name=None):
             # Divide the pairwise distances by the bfactor pairwise sums.
             bfact_norms = np.divide(np.square(diffs), bfact_sums)
             norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
+        elif predictBFactors:
+            diffs = u - bfactors #u is predicted b factors and bfactors is the known b factors.
+            norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
         else:
             norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 

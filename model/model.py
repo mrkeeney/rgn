@@ -219,14 +219,16 @@ class RGNModel(object):
                 coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
                 useBFactors = config.optimization['use_b_factors']
                 useInverseJacobian = config.optimization['use_inverse_jacobian']
+                predictBFactors = config.optimization['predict_b_factors']
                 drmsds, diffs, u, v, bfactors_2, drmsds_no_b = _drmsds(merge_dicts(config.optimization, config.loss, config.io),
-                                                                       coordinates, tertiaries, bfactors, useBFactors, useInverseJacobian, weights)
+                                                                       coordinates, tertiaries, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights)
 
                 # Return tensors to be printed.
-                # self.ret_diffs = diffs
-                # self.ret_u = u
+                self.ret_drmsds = drmsds
+                self.ret_diffs = diffs
+                self.ret_u = u
                 # self.ret_v = v
-                # self.ret_bfactors_2 = bfactors_2
+                self.ret_bfactors_2 = bfactors_2
 
                 if mode == 'evaluation': 
                     prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
@@ -500,6 +502,7 @@ class RGNModel(object):
             self.dflow_bfactors = self._dflow_bfactors
             self.dflow_primaries = self._dflow_primaries
             self.dflow_tertiaries = self._dflow_tertiaries
+            self.dflow_drmsds = self._dflow_drmsds
             self.dflow_diffs = self._dflow_diffs
             self.dflow_u = self._dflow_u
             self.dflow_v = self._dflow_v
@@ -549,6 +552,9 @@ class RGNModel(object):
 
     def _training_dict_fetcher(self, session):
         return session.run(self.training_dict)
+
+    def _dflow_drmsds(self, session):
+        return session.run(self.ret_drmsds)
 
     def _dflow_diffs(self, session):
         return session.run(self.ret_diffs)
@@ -1099,7 +1105,7 @@ def _coordinates(config, dihedrals):
 
     return coordinates
 
-def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacobian, weights):
+def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights):
     """ Computes reduced weighted dRMSD loss (as specified by weights) 
         between predicted tertiary structures and targets. """
 
@@ -1114,7 +1120,7 @@ def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacob
         bfactors    =    bfactors[:, 1::NUM_DIHEDRALS]
 
     # compute per structure dRMSDs
-    drmsds, diffs, u, v, bfactors_2, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds, diffs, u, v, bfactors_2, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)
