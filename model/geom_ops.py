@@ -283,8 +283,12 @@ def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, predictBFactors, weig
             bfact_norms = np.divide(np.square(diffs), bfact_sums)
             norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
         elif predictBFactors:
-            diffs = u - bfactors #u is predicted b factors and bfactors is the known b factors.
-            norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
+            # Calculate the pairwise sums of bfactors that correspond to the pairwise distances for target and known coordinates.
+            bfact_sums = remove_zeros(pairwise_sums_bfactors(bfactors))
+
+            # Divide the pairwise distances by the bfactor pairwise sums.
+            bfact_norms = np.divide(diffs, bfact_sums)
+            norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
         else:
             norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 

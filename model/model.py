@@ -227,7 +227,7 @@ class RGNModel(object):
                 self.ret_drmsds = drmsds
                 self.ret_diffs = diffs
                 self.ret_u = u
-                # self.ret_v = v
+                self.ret_v = v
                 self.ret_bfactors_2 = bfactors_2
 
                 if mode == 'evaluation': 
@@ -536,19 +536,18 @@ class RGNModel(object):
 
     #Data flow methods for printing tensors.
 
-    def _dflow_step(self, session):
+    #def _dflow_step(self, session):
         """ Returns the  dataflow step. """
+    #    return session.run(self.ret_numsteps)
 
-        return session.run(self.ret_numsteps)
+    #def _dflow_bfactors(self, session):
+    #    return session.run(self.ret_bfactors)
 
-    def _dflow_bfactors(self, session):
-        return session.run(self.ret_bfactors)
+    #def _dflow_tertiaries(self, session):
+    #    return session.run(self.ret_tertiaries)
 
-    def _dflow_tertiaries(self, session):
-        return session.run(self.ret_tertiaries)
-
-    def _dflow_primaries(self, session):
-        return session.run(self.ret_primaries)
+    #def _dflow_primaries(self, session):
+    #    return session.run(self.ret_primaries)
 
     def _training_dict_fetcher(self, session):
         return session.run(self.training_dict)
@@ -567,12 +566,6 @@ class RGNModel(object):
 
     def _dflow_bfactors_2(self, session):
         return session.run(self.ret_bfactors_2)
-
-    def _dflow_norms(self, session):
-        return session.run(self.ret_norms)
-
-    def _dflow_losses(self, session):
-        return session.run(self.ret_losses)
 
     def _bfactors_to_array(self, bfactors):
         return
