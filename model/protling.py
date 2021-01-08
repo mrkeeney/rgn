@@ -439,9 +439,9 @@ def loop(args):
     # print("primaries:")
     # print(primaries_print)
 
-    # tertiaries_print = models['training'].dflow_tertiaries(session)
-    # print("tertiaries:")
-    # print(tertiaries_print)
+    #tertiaries_print = models['training'].dflow_tertiaries(session)
+    #print("tertiaries:")
+    #print(tertiaries_print)
 
     # norms_print = models['training'].dflow_norms(session)
     # print("norms:")
@@ -455,17 +455,25 @@ def loop(args):
     # print("diffs:")
     # print(diffs_print)
 
-    # u_print = models['training'].dflow_u(session)
-    # print("u:")
-    # print(u_print)
+    #u_print = models['training'].dflow_u(session)
+    #print("u:")
+    #print(u_print)
 
-    # v_print = models['training'].dflow_v(session)
-    # print("v:")
-    # print(v_print)
+    #v_print = models['training'].dflow_v(session)
+    #print("v:")
+    #print(v_print)
+
+    bfactors_prediction_print = models['training'].dflow_bfactors_prediction(session)
+    print("bfactors_prediction:")
+    print(bfactors_prediction_print)
 
     # bfactors_2_print = models['training'].dflow_bfactors_2(session)
     # print("bfactors_2:")
     # print(bfactors_2_print)
+
+    # norms_print = models['training'].dflow_norms(session)
+    # print("norms:")
+    # print(norms_print)
 
     # bfact_sums_print = models['training'].dflow_bfact_sums(session)
     # print("bfact_sums:")

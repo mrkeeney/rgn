@@ -177,13 +177,14 @@ class RGNModel(object):
             else:
                 max_length = config.optimization['num_steps']
             dataflow_config = merge_dicts(config.io, config.initialization, config.optimization, config.queueing)
-            ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, num_stepss = _dataflow(dataflow_config, max_length)
+            ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, bfactors_prediction, num_stepss = _dataflow(dataflow_config, max_length)
 
             #Return tensors to be printed.
             # self.ret_numsteps = num_stepss
             # self.ret_bfactors = bfactors
             # self.ret_primaries = primaries
             # self.ret_tertiaries = tertiaries
+            #self.ret_bfactors_prediction = bfactors_prediction
 
             # Set up inputs
             inputs = _inputs(merge_dicts(config.architecture, config.initialization), primaries, evolutionaries)
@@ -220,8 +221,8 @@ class RGNModel(object):
                 useBFactors = config.optimization['use_b_factors']
                 useInverseJacobian = config.optimization['use_inverse_jacobian']
                 predictBFactors = config.optimization['predict_b_factors']
-                drmsds, diffs, u, v, bfactors_2, drmsds_no_b = _drmsds(merge_dicts(config.optimization, config.loss, config.io),
-                                                                       coordinates, tertiaries, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights)
+                drmsds, diffs, u, v, bfactors_2, bfactors_prediction_returned, drmsds_no_b = _drmsds(merge_dicts(config.optimization, config.loss, config.io),
+                                                                       coordinates, tertiaries, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights)
 
                 # Return tensors to be printed.
                 self.ret_drmsds = drmsds
@@ -229,6 +230,7 @@ class RGNModel(object):
                 self.ret_u = u
                 self.ret_v = v
                 self.ret_bfactors_2 = bfactors_2
+                self.ret_bfactors_prediction = bfactors_prediction_returned
 
                 if mode == 'evaluation': 
                     prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
@@ -495,20 +497,21 @@ class RGNModel(object):
             self.current_step = self._current_step
             self.finish       = self._finish
 
-            self.training_dict_fetcher = self._training_dict_fetcher
+            #self.training_dict_fetcher = self._training_dict_fetcher
 
             #Data flow for tensors that get printed.
-            self.dflow_step = self._dflow_step
-            self.dflow_bfactors = self._dflow_bfactors
-            self.dflow_primaries = self._dflow_primaries
-            self.dflow_tertiaries = self._dflow_tertiaries
-            self.dflow_drmsds = self._dflow_drmsds
-            self.dflow_diffs = self._dflow_diffs
+            #self.dflow_step = self._dflow_step
+            #self.dflow_bfactors = self._dflow_bfactors
+            #self.dflow_primaries = self._dflow_primaries
+            #self.dflow_tertiaries = self._dflow_tertiaries
+            #self.dflow_drmsds = self._dflow_drmsds
+            #self.dflow_diffs = self._dflow_diffs
+            self.dflow_bfactors_prediction = self._dflow_bfactors_prediction
             self.dflow_u = self._dflow_u
             self.dflow_v = self._dflow_v
             self.dflow_bfactors_2 = self._dflow_bfactors_2
             self.dflow_norms = self._dflow_norms
-            self.dflow_losses = self._dflow_losses
+            #self.dflow_losses = self._dflow_losses
 
             del self.start
 
@@ -549,14 +552,14 @@ class RGNModel(object):
     #def _dflow_primaries(self, session):
     #    return session.run(self.ret_primaries)
 
-    def _training_dict_fetcher(self, session):
-        return session.run(self.training_dict)
+    #def _training_dict_fetcher(self, session):
+    #    return session.run(self.training_dict)
 
-    def _dflow_drmsds(self, session):
-        return session.run(self.ret_drmsds)
+    #def _dflow_drmsds(self, session):
+    #    return session.run(self.ret_drmsds)
 
-    def _dflow_diffs(self, session):
-        return session.run(self.ret_diffs)
+    #def _dflow_diffs(self, session):
+    #    return session.run(self.ret_diffs)
 
     def _dflow_u(self, session):
         return session.run(self.ret_u)
@@ -567,8 +570,14 @@ class RGNModel(object):
     def _dflow_bfactors_2(self, session):
         return session.run(self.ret_bfactors_2)
 
-    def _bfactors_to_array(self, bfactors):
-        return
+    def _dflow_norms(self, session):
+        return session.run(self.ret_norms)
+
+    def _dflow_bfactors_prediction(self, session):
+        return session.run(self.ret_bfactors_prediction)
+
+    #def _bfactors_to_array(self, bfactors):
+    #    return
 
     def _finish(self, session, save=True, close_session=True, reset_graph=True):
         """ Instructs the model to shutdown. """
@@ -686,11 +695,18 @@ def _dataflow(config, max_length):
                      # b factors, i.e. experimental temperature factors.
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIMENSIONS, BATCH_SIZE]
 
+    #bfactors_expanded = tf.expand_dims(bfactors_batch_major, 2)
+    #bfactors_prediction = tf.repeat(bfactors_expanded, repeats=[0,3,0])
+    #bfactors_prediction = tf.tile([True], tf.shape(ids))
+    multiply = tf.constant([1,3])
+    bfactors_prediction = tf.reshape(tf.tile(bfactors_batch_major, multiply), [-1, 3, tf.shape(bfactors_batch_major)[1]])
+    bfactors_prediction = tf.transpose(bfactors_prediction,     perm=(2, 0, 1), name='bfactors_prediction')
+
     # assign names to the nameless
     ids = tf.identity(ids, name='ids')
     num_stepss = tf.identity(num_stepss, name='num_stepss')
 
-    return ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, num_stepss
+    return ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, bfactors_prediction, num_stepss
 
 def _inputs(config, primaries, evolutionaries):
     """ Returns final concatenated input for use in recurrent layer. """
@@ -1098,7 +1114,7 @@ def _coordinates(config, dihedrals):
 
     return coordinates
 
-def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights):
+def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights):
     """ Computes reduced weighted dRMSD loss (as specified by weights) 
         between predicted tertiary structures and targets. """
 
@@ -1111,14 +1127,15 @@ def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacob
         coordinates = coordinates[1::NUM_DIHEDRALS] # [NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE, NUM_DIMENSIONS]
         targets     =     targets[1::NUM_DIHEDRALS] # [NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE, NUM_DIMENSIONS]
         bfactors    =    bfactors[:, 1::NUM_DIHEDRALS]
+        bfactors_prediction    =    bfactors_prediction[1::NUM_DIHEDRALS]
 
     # compute per structure dRMSDs
-    drmsds, diffs, u, v, bfactors_2, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds, diffs, u, v, bfactors_2,bfactors_prediction_returned, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)
 
-    return drmsds, diffs, u, v, bfactors_2, drmsds_no_b
+    return drmsds, diffs, u, v, bfactors_2, bfactors_prediction_returned, drmsds_no_b
 
 def _reduce_loss_quotient(config, losses, masks, group_filter, name_prefix=''):
     """ Reduces loss according to normalization order. """

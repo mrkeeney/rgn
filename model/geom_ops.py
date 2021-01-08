@@ -240,7 +240,7 @@ def point_to_coordinate(pt, num_fragments=6, parallel_iterations=4, swap_memory=
 
         return coords
 
-def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights, name=None):
+def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights, name=None):
     """ Computes the dRMSD of two tensors of vectors.
 
         Vectors are assumed to be in the third dimension. Op is done element-wise over batch.
@@ -259,6 +259,7 @@ def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, predictBFactors, weig
     with tf.name_scope(name, 'dRMSD', [u, v, weights]) as scope:
         u = tf.convert_to_tensor(u, name='u')
         v = tf.convert_to_tensor(v, name='v')
+        bfactors_prediction = tf.convert_to_tensor(bfactors_prediction, name='bfactors_prediction')
 
         bfactors = tf.convert_to_tensor(bfactors, name='bfactors')
         weights = tf.convert_to_tensor(weights, name='weights')
@@ -283,16 +284,13 @@ def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, predictBFactors, weig
             bfact_norms = np.divide(np.square(diffs), bfact_sums)
             norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
         elif predictBFactors:
-            # Calculate the pairwise sums of bfactors that correspond to the pairwise distances for target and known coordinates.
-            bfact_sums = remove_zeros(pairwise_sums_bfactors(bfactors))
-
-            # Divide the pairwise distances by the bfactor pairwise sums.
-            bfact_norms = np.divide(diffs, bfact_sums)
-            norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
+            diffs = pairwise_distance(u) - pairwise_distance(bfactors_prediction) #u is predicted b factors and bfactors is the known b factors.
+            #Currently, u and bfactors do not have the same dimensions for subtraction.
+            norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
         else:
             norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 
-        return norms, diffs, u, v, bfactors, norms_no_b
+        return norms, diffs, u, v, bfactors, bfactors_prediction, norms_no_b
 
 def pairwise_distance(u, name=None):
     """ Computes the pairwise distance (l2 norm) between all vectors in the tensor.
