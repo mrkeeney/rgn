@@ -208,10 +208,12 @@ def predict_and_log(log_dir, configs, models, session):
                 for _ in range(configs[label].queueing['num_evaluation_invocations']):
                     dicts = model.predict(session)
                     for idx, dict_ in dicts.iteritems():
-                        if 'tertiary' in dict_:
-                            np.savetxt(os.path.join(outputs_dir, idx + '.tertiary'), dict_['tertiary'], header='\n')
-                        if 'recurrent_states' in dict_:
-                            np.savetxt(os.path.join(outputs_dir, idx + '.recurrent_states'), dict_['recurrent_states'])
+                        #if 'tertiary' in dict_:
+                        #    np.savetxt(os.path.join(outputs_dir, idx + '.tertiary'), dict_['tertiary'], header='\n')
+                        #if 'recurrent_states' in dict_:
+                        #    np.savetxt(os.path.join(outputs_dir, idx + '.recurrent_states'), dict_['recurrent_states'])
+                        if 'bfactors' in dict_:
+                            np.savetxt(os.path.join(outputs_dir, idx + '.bfactors'), dict_['bfactors'])
 
 def loop(args):
     # create config and model collection objects, and retrieve the run config

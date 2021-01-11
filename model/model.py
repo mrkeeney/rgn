@@ -232,8 +232,8 @@ class RGNModel(object):
                 self.ret_bfactors_2 = bfactors_2
                 self.ret_bfactors_prediction = bfactors_prediction_returned
 
-                if mode == 'evaluation': 
-                    prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
+                if mode == 'evaluation':
+                    prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states, 'bfactors': u})
 
             # Losses
             if config.loss['include']:
@@ -362,15 +362,17 @@ class RGNModel(object):
 
             # generate return dict
             predictions = {}
-            for id_, num_steps, tertiary, recurrent_states in izip_longest(*[prediction_dict.get(key, []) 
-                                                                           for key in ['ids', 'num_stepss', 'coordinates', 'recurrent_states']]):
+            for id_, num_steps, tertiary, recurrent_states, bfactors in izip_longest(*[prediction_dict.get(key, [])
+                                                                           for key in ['ids', 'num_stepss', 'coordinates', 'recurrent_states', 'bfactors']]):
                 prediction = {}
 
                 if tertiary is not None:
                     last_atom = (num_steps - self.config.io['num_edge_residues']) * NUM_DIHEDRALS
-                    prediction.update({'tertiary': tertiary[:, :last_atom]})
+                    #prediction.update({'tertiary': tertiary[:, :last_atom]})
 
-                prediction.update({'recurrent_states': recurrent_states})
+                #prediction.update({'recurrent_states': recurrent_states})
+
+                prediction.update({'bfactors': bfactors})
 
                 predictions.update({id_: prediction})
 
@@ -1130,7 +1132,7 @@ def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacob
         bfactors_prediction    =    bfactors_prediction[1::NUM_DIHEDRALS]
 
     # compute per structure dRMSDs
-    drmsds, diffs, u, v, bfactors_2,bfactors_prediction_returned, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds, diffs, u, v, bfactors_2, bfactors_prediction_returned, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)
