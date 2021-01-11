@@ -284,13 +284,35 @@ def drmsd(u, v, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfac
             bfact_norms = np.divide(np.square(diffs), bfact_sums)
             norms = reduce_l2_norm(bfact_norms, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
         elif predictBFactors:
-            diffs = pairwise_distance(u) - pairwise_distance(bfactors_prediction) #u is predicted b factors and bfactors is the known b factors.
-            #Currently, u and bfactors do not have the same dimensions for subtraction.
+            diffs = pairwise_tile(u) - pairwise_tile(bfactors_prediction)
             norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
         else:
             norms = reduce_l2_norm(diffs, reduction_indices=[0, 1], weights=weights, name=scope) # [BATCH_SIZE]
 
         return norms, diffs, u, v, bfactors, bfactors_prediction, norms_no_b
+
+def pairwise_tile(u, name=None):
+    """ Computes the pairwise distance (l2 norm) between all vectors in the tensor.
+
+        Vectors are assumed to be in the third dimension. Op is done element-wise over batch.
+
+    Args:
+        u: [NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
+
+    Returns:
+           [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
+
+    """
+    with tf.name_scope(name, 'pairwise_distance', [u]) as scope:
+        u = tf.convert_to_tensor(u, name='u')
+
+        expand = tf.expand_dims(u, 1)
+        expand_zeros = all_zeros(expand)
+        diffs = u - expand_zeros                               # [NUM_STEPS, NUM_STEPS, BATCH_SIZE, NUM_DIMENSIONS]
+        norms = reduce_l2_norm(diffs, reduction_indices=[3], name=scope) # [NUM_STEPS, NUM_STEPS, BATCH_SIZE]
+
+        return norms
+
 
 def pairwise_distance(u, name=None):
     """ Computes the pairwise distance (l2 norm) between all vectors in the tensor.
@@ -327,3 +349,6 @@ def pairwise_sums_bfactors(bfactors):
 
 def remove_zeros(bfact_sums):
     return tf.where(tf.equal(bfact_sums, 0), tf.ones_like(bfact_sums), bfact_sums)
+
+def all_zeros(u):
+    return tf.zeros_like(u)

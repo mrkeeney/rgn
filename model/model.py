@@ -505,7 +505,7 @@ class RGNModel(object):
             #self.dflow_primaries = self._dflow_primaries
             #self.dflow_tertiaries = self._dflow_tertiaries
             #self.dflow_drmsds = self._dflow_drmsds
-            #self.dflow_diffs = self._dflow_diffs
+            self.dflow_diffs = self._dflow_diffs
             self.dflow_bfactors_prediction = self._dflow_bfactors_prediction
             self.dflow_u = self._dflow_u
             self.dflow_v = self._dflow_v
@@ -558,8 +558,8 @@ class RGNModel(object):
     #def _dflow_drmsds(self, session):
     #    return session.run(self.ret_drmsds)
 
-    #def _dflow_diffs(self, session):
-    #    return session.run(self.ret_diffs)
+    def _dflow_diffs(self, session):
+        return session.run(self.ret_diffs)
 
     def _dflow_u(self, session):
         return session.run(self.ret_u)
@@ -698,7 +698,7 @@ def _dataflow(config, max_length):
     #bfactors_expanded = tf.expand_dims(bfactors_batch_major, 2)
     #bfactors_prediction = tf.repeat(bfactors_expanded, repeats=[0,3,0])
     #bfactors_prediction = tf.tile([True], tf.shape(ids))
-    multiply = tf.constant([1,3])
+    multiply = tf.constant([1, 3])
     bfactors_prediction = tf.reshape(tf.tile(bfactors_batch_major, multiply), [-1, 3, tf.shape(bfactors_batch_major)[1]])
     bfactors_prediction = tf.transpose(bfactors_prediction,     perm=(2, 0, 1), name='bfactors_prediction')
 

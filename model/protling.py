@@ -451,9 +451,9 @@ def loop(args):
     # print("losses_filtered:")
     # print(losses_filtered_print)
 
-    # diffs_print = models['training'].dflow_diffs(session)
-    # print("diffs:")
-    # print(diffs_print)
+    #diffs_print = models['training'].dflow_diffs(session)
+    #print("diffs:")
+    #print(diffs_print)
 
     #u_print = models['training'].dflow_u(session)
     #print("u:")
@@ -463,9 +463,9 @@ def loop(args):
     #print("v:")
     #print(v_print)
 
-    bfactors_prediction_print = models['training'].dflow_bfactors_prediction(session)
-    print("bfactors_prediction:")
-    print(bfactors_prediction_print)
+    #bfactors_prediction_print = models['training'].dflow_bfactors_prediction(session)
+    #print("bfactors_prediction:")
+    #print(bfactors_prediction_print)
 
     # bfactors_2_print = models['training'].dflow_bfactors_2(session)
     # print("bfactors_2:")
