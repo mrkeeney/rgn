@@ -84,7 +84,7 @@ def effective_steps(masks, num_edge_residues, name=None):
 
         return eff_stepss
 
-def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries, name=None):
+def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries, predictBFactors, name=None):
     """ Reads and parses a protein TF Record. 
 
         Primary sequences are mapped onto 20-dimensional one-hot vectors.
@@ -144,8 +144,12 @@ def read_protein(filename_queue, max_length, num_edge_residues, num_evo_entries,
 
         # Generate tertiary masking matrix. If mask is missing then assume all residues are present
         mask = tf.cond(tf.not_equal(tf.size(mask), 0), lambda: mask, lambda: tf.ones([pri_length - num_edge_residues]))
-        ter_mask = masking_matrix(mask, name='ter_mask')
-
+        
+        if predictBFactors:
+            ter_mask = mask
+        else:
+            ter_mask = masking_matrix(mask, name='ter_mask')
+        
         # Return tuple
         return id_, one_hot_primary, evolutionary, secondary, tertiary, ter_mask, bfactor, pri_length, keep
 

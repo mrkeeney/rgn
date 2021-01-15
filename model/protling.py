@@ -206,14 +206,24 @@ def predict_and_log(log_dir, configs, models, session):
                 if not os.path.exists(outputs_dir): os.makedirs(outputs_dir)
 
                 for _ in range(configs[label].queueing['num_evaluation_invocations']):
-                    dicts = model.predict(session)
+                    predictBFactors = configs[label].optimization['predict_b_factors']
+                    dicts = model.predict(session, predictBFactors)
                     for idx, dict_ in dicts.iteritems():
-                        #if 'tertiary' in dict_:
-                        #    np.savetxt(os.path.join(outputs_dir, idx + '.tertiary'), dict_['tertiary'], header='\n')
-                        #if 'recurrent_states' in dict_:
-                        #    np.savetxt(os.path.join(outputs_dir, idx + '.recurrent_states'), dict_['recurrent_states'])
-                        if 'bfactors' in dict_:
-                            np.savetxt(os.path.join(outputs_dir, idx + '.bfactors'), dict_['bfactors'])
+                        if 'tertiary' in dict_:
+                            np.savetxt(os.path.join(outputs_dir, idx + '.tertiary'), dict_['tertiary'], header='\n')
+                            result = []
+                            if predictBFactors:
+                                with open(os.path.join(outputs_dir, idx + '.tertiary'), 'r') as f:
+                                    for line in f:
+                                        if not line.startswith('#'):
+                                            result.append([float(i) for i in line.split()])
+                                bfactors = ''
+                                for i in range(len(result[0])):
+                                    average = (result[0][i] + result[1][i] + result[2][i]) / 3
+                                    bfactors += str(average) + "\n"
+                                with open(os.path.join(outputs_dir, idx + '.bfactors'), 'w') as f: f.write(bfactors)
+                        if 'recurrent_states' in dict_:
+                            np.savetxt(os.path.join(outputs_dir, idx + '.recurrent_states'), dict_['recurrent_states'])                  
 
 def loop(args):
     # create config and model collection objects, and retrieve the run config
@@ -448,34 +458,30 @@ def loop(args):
     # norms_print = models['training'].dflow_norms(session)
     # print("norms:")
     # print(norms_print)
-    #
+
     # losses_filtered_print = models['training'].dflow_losses(session)
     # print("losses_filtered:")
     # print(losses_filtered_print)
 
-    #diffs_print = models['training'].dflow_diffs(session)
-    #print("diffs:")
-    #print(diffs_print)
+    # diffs_print = models['training'].dflow_diffs(session)
+    # print("diffs:")
+    # print(diffs_print)
 
-    #u_print = models['training'].dflow_u(session)
-    #print("u:")
-    #print(u_print)
+    # masks_print = models['training'].dflow_masks(session)
+    # print("masks:")
+    # print(masks_print)
+
+    # u_print = models['training'].dflow_u(session)
+    # print("u:")
+    # print(u_print)
 
     #v_print = models['training'].dflow_v(session)
     #print("v:")
     #print(v_print)
 
-    #bfactors_prediction_print = models['training'].dflow_bfactors_prediction(session)
-    #print("bfactors_prediction:")
-    #print(bfactors_prediction_print)
-
     # bfactors_2_print = models['training'].dflow_bfactors_2(session)
     # print("bfactors_2:")
     # print(bfactors_2_print)
-
-    # norms_print = models['training'].dflow_norms(session)
-    # print("norms:")
-    # print(norms_print)
 
     # bfact_sums_print = models['training'].dflow_bfact_sums(session)
     # print("bfact_sums:")

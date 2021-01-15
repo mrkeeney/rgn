@@ -37,7 +37,6 @@ DUMMY_LOSS = -1.
 PREFETCH_BUFFER = 10
 LOSS_SCALING_FACTOR = 0.01 # this is to convert recorded losses to angstroms
 
-
 class RGNModel(object):
     """Recurrent geometric network model"""
 
@@ -170,6 +169,8 @@ class RGNModel(object):
                                                   initializer=tf.constant_initializer(config.curriculum['base']))
                 if mode == 'training': diagnostic_ops.update({'curriculum_step': curriculum_step})
 
+            predictBFactors = config.optimization['predict_b_factors']
+
             # Set up data ports
             if mode == 'training': self._coordinator = tf.train.Coordinator()
             if config.curriculum['mode'] == 'length':
@@ -177,14 +178,13 @@ class RGNModel(object):
             else:
                 max_length = config.optimization['num_steps']
             dataflow_config = merge_dicts(config.io, config.initialization, config.optimization, config.queueing)
-            ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, bfactors_prediction, num_stepss = _dataflow(dataflow_config, max_length)
+            ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, num_stepss = _dataflow(dataflow_config, max_length, predictBFactors)
 
             #Return tensors to be printed.
             # self.ret_numsteps = num_stepss
             # self.ret_bfactors = bfactors
             # self.ret_primaries = primaries
             # self.ret_tertiaries = tertiaries
-            #self.ret_bfactors_prediction = bfactors_prediction
 
             # Set up inputs
             inputs = _inputs(merge_dicts(config.architecture, config.initialization), primaries, evolutionaries)
@@ -214,15 +214,24 @@ class RGNModel(object):
                 dihedrals_config.update({k: dihedrals_config[k][-1] for k in ['alphabet_keep_probability',
                                                                               'alphabet_normalization']})
                 if not dihedrals_config['single_or_no_alphabet']: dihedrals_config.update({'alphabet_size': dihedrals_config['alphabet_size'][-1]})
-                dihedrals = _dihedrals(mode, dihedrals_config, recurrent_outputs, alphabet=alphabet)
+                if predictBFactors:
+                    # generate b factor predictions instead of dihedrals
+                    dihedrals = _predict_b_factors(mode, dihedrals_config, recurrent_outputs, alphabet=alphabet)
+                    multiply = tf.constant([3, 1, 1])
+                    coordinates = tf.tile(dihedrals, multiply)
+                    weights = masks
+                    global LOSS_SCALING_FACTOR
+                    LOSS_SCALING_FACTOR = 1.0
+                else:
+                    dihedrals = _dihedrals(mode, dihedrals_config, recurrent_outputs, alphabet=alphabet)
+                    # Convert dihedrals into full 3D structures and compute dRMSDs
+                    coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
 
-                # Convert dihedrals into full 3D structures and compute dRMSDs
-                coordinates = _coordinates(merge_dicts(config.computing, config.optimization, config.queueing), dihedrals)
                 useBFactors = config.optimization['use_b_factors']
-                useInverseJacobian = config.optimization['use_inverse_jacobian']
-                predictBFactors = config.optimization['predict_b_factors']
-                drmsds, diffs, u, v, bfactors_2, bfactors_prediction_returned, drmsds_no_b = _drmsds(merge_dicts(config.optimization, config.loss, config.io),
-                                                                       coordinates, tertiaries, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights)
+                useInverseJacobian = config.optimization['use_inverse_jacobian']                    
+
+                drmsds, diffs, u, v, bfactors_2, drmsds_no_b = _drmsds(merge_dicts(config.optimization, config.loss, config.io),
+                                                                       coordinates, tertiaries, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights)
 
                 # Return tensors to be printed.
                 self.ret_drmsds = drmsds
@@ -230,10 +239,10 @@ class RGNModel(object):
                 self.ret_u = u
                 self.ret_v = v
                 self.ret_bfactors_2 = bfactors_2
-                self.ret_bfactors_prediction = bfactors_prediction_returned
+                self.ret_masks = masks
 
                 if mode == 'evaluation':
-                    prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states, 'bfactors': u})
+                    prediction_ops.update({'ids': ids, 'coordinates': coordinates, 'num_stepss': num_stepss, 'recurrent_states': recurrent_states})
 
             # Losses
             if config.loss['include']:
@@ -350,7 +359,7 @@ class RGNModel(object):
         else:
             raise RuntimeError('Model has not been started or has already finished.')
 
-    def _predict(self, session):
+    def _predict(self, session, predictBFactors):
         """ Predict 3D structures. """
 
         if RGNModel._is_started:
@@ -362,17 +371,19 @@ class RGNModel(object):
 
             # generate return dict
             predictions = {}
-            for id_, num_steps, tertiary, recurrent_states, bfactors in izip_longest(*[prediction_dict.get(key, [])
-                                                                           for key in ['ids', 'num_stepss', 'coordinates', 'recurrent_states', 'bfactors']]):
+            for id_, num_steps, tertiary, recurrent_states in izip_longest(*[prediction_dict.get(key, [])
+                                                                           for key in ['ids', 'num_stepss', 'coordinates', 'recurrent_states']]):
+
                 prediction = {}
 
                 if tertiary is not None:
                     last_atom = (num_steps - self.config.io['num_edge_residues']) * NUM_DIHEDRALS
-                    #prediction.update({'tertiary': tertiary[:, :last_atom]})
+                    if predictBFactors:
+                        prediction.update({'tertiary': tertiary[:, 1:last_atom:NUM_DIHEDRALS]})
+                    else:
+                        prediction.update({'tertiary': tertiary[:, :last_atom]})
 
-                #prediction.update({'recurrent_states': recurrent_states})
-
-                prediction.update({'bfactors': bfactors})
+                prediction.update({'recurrent_states': recurrent_states})
 
                 predictions.update({id_: prediction})
 
@@ -499,7 +510,7 @@ class RGNModel(object):
             self.current_step = self._current_step
             self.finish       = self._finish
 
-            #self.training_dict_fetcher = self._training_dict_fetcher
+            self.training_dict_fetcher = self._training_dict_fetcher
 
             #Data flow for tensors that get printed.
             #self.dflow_step = self._dflow_step
@@ -508,11 +519,11 @@ class RGNModel(object):
             #self.dflow_tertiaries = self._dflow_tertiaries
             #self.dflow_drmsds = self._dflow_drmsds
             self.dflow_diffs = self._dflow_diffs
-            self.dflow_bfactors_prediction = self._dflow_bfactors_prediction
             self.dflow_u = self._dflow_u
             self.dflow_v = self._dflow_v
             self.dflow_bfactors_2 = self._dflow_bfactors_2
             self.dflow_norms = self._dflow_norms
+            self.dflow_masks = self._dflow_masks
             #self.dflow_losses = self._dflow_losses
 
             del self.start
@@ -542,23 +553,22 @@ class RGNModel(object):
     #Data flow methods for printing tensors.
 
     #def _dflow_step(self, session):
-        """ Returns the  dataflow step. """
     #    return session.run(self.ret_numsteps)
 
-    #def _dflow_bfactors(self, session):
+    # def _dflow_bfactors(self, session):
     #    return session.run(self.ret_bfactors)
 
-    #def _dflow_tertiaries(self, session):
+    # def _dflow_tertiaries(self, session):
     #    return session.run(self.ret_tertiaries)
 
-    #def _dflow_primaries(self, session):
+    # def _dflow_primaries(self, session):
     #    return session.run(self.ret_primaries)
 
-    #def _training_dict_fetcher(self, session):
-    #    return session.run(self.training_dict)
+    def _training_dict_fetcher(self, session):
+       return session.run(self.training_dict)
 
-    #def _dflow_drmsds(self, session):
-    #    return session.run(self.ret_drmsds)
+    def _dflow_drmsds(self, session):
+       return session.run(self.ret_drmsds)
 
     def _dflow_diffs(self, session):
         return session.run(self.ret_diffs)
@@ -573,13 +583,10 @@ class RGNModel(object):
         return session.run(self.ret_bfactors_2)
 
     def _dflow_norms(self, session):
-        return session.run(self.ret_norms)
+        return session.run(self.ret_drmsds)
 
-    def _dflow_bfactors_prediction(self, session):
-        return session.run(self.ret_bfactors_prediction)
-
-    #def _bfactors_to_array(self, bfactors):
-    #    return
+    def _dflow_masks(self, session):
+        return session.run(self.ret_masks)
 
     def _finish(self, session, save=True, close_session=True, reset_graph=True):
         """ Instructs the model to shutdown. """
@@ -620,7 +627,7 @@ def _device_function_constructor(functions_on_devices={}, default_device=''):
 
     return device_function
 
-def _dataflow(config, max_length):
+def _dataflow(config, max_length, predictBFactors):
     """ Creates TF queues and nodes for inputting and batching data. """
 
     # files
@@ -639,7 +646,7 @@ def _dataflow(config, max_length):
         name='file_queue')
 
     # read instance
-    inputs = read_protein(file_queue, max_length, config['num_edge_residues'], config['num_evo_entries'])
+    inputs = read_protein(file_queue, max_length, config['num_edge_residues'], config['num_evo_entries'], predictBFactors)
 
     # randomization
     if config['shuffle']: # based on https://github.com/tensorflow/tensorflow/issues/5147#issuecomment-271086206
@@ -688,27 +695,23 @@ def _dataflow(config, max_length):
     tertiaries     = tf.transpose(tertiaries_batch_major,     perm=(1, 0, 2), name='tertiaries')
                      # tertiary sequences, i.e. sequences of 3D coordinates.
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIHEDRALS, BATCH_SIZE, NUM_DIMENSIONS]
-
-    masks          = tf.transpose(masks_batch_major,          perm=(1, 2, 0), name='masks')
+    
+    if predictBFactors:
+        masks          = tf.transpose(masks_batch_major,          perm=(1, 0), name='masks')
+        bfactors       = tf.transpose(bfactors_batch_major,     perm=(1, 0), name='bfactors')
+    else:
+        masks          = tf.transpose(masks_batch_major,          perm=(1, 2, 0), name='masks')
                      # mask matrix for each datum that masks meaningless distances.
                      # [NUM_STEPS - NUM_EDGE_RESIDUES, NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE]
-
-    bfactors       = tf.transpose(bfactors_batch_major,     perm=(0, 1), name='bfactors')
+        bfactors       = tf.transpose(bfactors_batch_major,     perm=(0, 1), name='bfactors')
                      # b factors, i.e. experimental temperature factors.
                      # [(NUM_STEPS - NUM_EDGE_RESIDUES) x NUM_DIMENSIONS, BATCH_SIZE]
-
-    #bfactors_expanded = tf.expand_dims(bfactors_batch_major, 2)
-    #bfactors_prediction = tf.repeat(bfactors_expanded, repeats=[0,3,0])
-    #bfactors_prediction = tf.tile([True], tf.shape(ids))
-    multiply = tf.constant([1, 3])
-    bfactors_prediction = tf.reshape(tf.tile(bfactors_batch_major, multiply), [-1, 3, tf.shape(bfactors_batch_major)[1]])
-    bfactors_prediction = tf.transpose(bfactors_prediction,     perm=(2, 0, 1), name='bfactors_prediction')
 
     # assign names to the nameless
     ids = tf.identity(ids, name='ids')
     num_stepss = tf.identity(num_stepss, name='num_stepss')
 
-    return ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, bfactors_prediction, num_stepss
+    return ids, primaries, evolutionaries, secondaries, tertiaries, masks, bfactors, num_stepss
 
 def _inputs(config, primaries, evolutionaries):
     """ Returns final concatenated input for use in recurrent layer. """
@@ -1004,6 +1007,25 @@ def _alphabet(mode, config):
 
     return alphabet
 
+def _predict_b_factors(mode, config, inputs, alphabet=None):
+    """ Converts internal representation resultant from RNN output activations
+        into dihedral angles based on one of many methods. 
+
+        The optional argument alphabet does not determine whether an alphabet 
+        should be created or not--that's controlled by config. Instead the
+        option allows the reuse of an existing alphabet. """
+    
+    output_size = NUM_DIHEDRALS
+    
+    dihedrals_inputs = inputs
+        # [NUM_STEPS, BATCH_SIZE, N x RECURRENT_LAYER_SIZE] where N is 1 or 2 depending on bidirectionality
+
+    linear = layers.fully_connected(dihedrals_inputs, output_size, scope='linear_dihedrals')
+             # [NUM_STEPS, BATCH_SIZE, OUTPUT_SIZE]
+    dihedrals = linear
+
+    return dihedrals
+
 def _dihedrals(mode, config, inputs, alphabet=None):
     """ Converts internal representation resultant from RNN output activations
         into dihedral angles based on one of many methods. 
@@ -1116,7 +1138,7 @@ def _coordinates(config, dihedrals):
 
     return coordinates
 
-def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights):
+def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights):
     """ Computes reduced weighted dRMSD loss (as specified by weights) 
         between predicted tertiary structures and targets. """
 
@@ -1128,16 +1150,18 @@ def _drmsds(config, coordinates, targets, bfactors, useBFactors, useInverseJacob
     if config['atoms'] == 'c_alpha': # starts at 1 because c_alpha atoms are the second atoms
         coordinates = coordinates[1::NUM_DIHEDRALS] # [NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE, NUM_DIMENSIONS]
         targets     =     targets[1::NUM_DIHEDRALS] # [NUM_STEPS - NUM_EDGE_RESIDUES, BATCH_SIZE, NUM_DIMENSIONS]
-        bfactors    =    bfactors[:, 1::NUM_DIHEDRALS]
-        bfactors_prediction    =    bfactors_prediction[1::NUM_DIHEDRALS]
+        if predictBFactors:
+            bfactors    =    bfactors[1::NUM_DIHEDRALS]
+        else:
+            bfactors    =    bfactors[:, 1::NUM_DIHEDRALS]
 
     # compute per structure dRMSDs
-    drmsds, diffs, u, v, bfactors_2, bfactors_prediction_returned, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, bfactors_prediction, weights, name='drmsds') # [BATCH_SIZE]
+    drmsds, diffs, u, v, bfactors_2, drmsds_no_b = drmsd(coordinates, targets, bfactors, useBFactors, useInverseJacobian, predictBFactors, weights, name='drmsds') # [BATCH_SIZE]
 
     # add to relevant collections for summaries, etc.
     if config['log_model_summaries']: tf.add_to_collection(config['name'] + '_drmsdss', drmsds)
 
-    return drmsds, diffs, u, v, bfactors_2, bfactors_prediction_returned, drmsds_no_b
+    return drmsds, diffs, u, v, bfactors_2, drmsds_no_b
 
 def _reduce_loss_quotient(config, losses, masks, group_filter, name_prefix=''):
     """ Reduces loss according to normalization order. """
