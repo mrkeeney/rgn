@@ -12,7 +12,7 @@ Extract all files in the [model](https://github.com/mallory-tollefson/rgn) direc
 The [`protling.py`](https://github.com/mallory-tollefson/rgn/blob/master/model/protling.py) script facilities training of and prediction using RGN models. Below are typical use cases. The script also accepts a number of command-line options whose functionality can be queried using the `--help` option.
 
 ### Train a new model or continue training an existing model
-Likelihood-RGN models are described using a configuration file that controls hyperparameters and architectural choices. For a list of available options and their descriptions, see its [documentation](https://github.com/mallory-tollefson/rgn/blob/master/CONFIG.md). Once a configuration file has been created, along with a suitable dataset (download a ready-made [ProteinNetX](TODO) data set or create a new one from scratch using the [`convert_to_tfrecord.py`](https://github.com/mallory-tollefson/rgn/blob/master/data_processing/convert_to_tfrecord.py) script to first create a ProteinNet data set, followed by updating the ProteinNet data set to a ProteinNetX data set with the scripts in the [`bfactor_scripts`](https://github.com/mallory-tollefson/rgn/tree/master/bfactor_scripts) directory). The following directory structure must be created:
+Likelihood-RGN models are described using a configuration file that controls hyperparameters and architectural choices. For a list of available options and their descriptions, see its [documentation](https://github.com/mallory-tollefson/rgn/blob/master/CONFIG.md). Once a configuration file has been created, along with a suitable dataset (download a ready-made [ProteinNetX](TODO) data set or create a new one from scratch using the [`convert_to_tfrecord.py`](https://github.com/mallory-tollefson/rgn/blob/master/data_processing/convert_to_tfrecord.py) script to first create a [ProteinNet](https://github.com/aqlaboratory/proteinnet) data set, followed by updating the [ProteinNet](https://github.com/aqlaboratory/proteinnet) data set to a ProteinNetX data set using the scripts in the [`bfactor_scripts`](https://github.com/mallory-tollefson/rgn/tree/master/bfactor_scripts) directory). The following directory structure must be created:
 
 ```
 <baseDirectory>/runs/<runName>/<datasetName>/<configurationFile>
@@ -56,10 +56,10 @@ python protling.py <baseDirectory>/runs/<runName>/<datasetName>/<configurationFi
 The first line searches the supplied database for matches to the supplied sequence and extracts a PSSM out of the results. It will generate multiple new files. These are then used in the second line to construct a text-based ProteinNet file (with 42 entries per evolutionary profile, compatible with the pre-trained RGN models). The third line converts the file to `TFRecords` format, and the fourth line copies the file to the testing directory of a pre-trained model. Finally the fifth line predicts the structure using the pre-trained RGN model. The outputs will be placed in  `<baseDirectory>/runs/<runName>/<datasetName>/<latestIterationNumber>/outputsTesting/` and will be comprised of two files: a `.tertiary` file which contains the atomic coordinates, and `.recurrent_states` file which contains the RGN latent representation of the sequence. The `-g0` option sets the GPU to be used to the one with index 0. If a different GPU is available change the setting appropriately.
 
 ## Pre-trained models
-Below we make available pre-trained Likelihood-RGN models using the [ProteinNetX](TODO) 12 dataset as checkpointed TF graphs.
+Below we make available pre-trained Likelihood-RGN models using the [ProteinNetX](TODO) 12 dataset as checkpointed TF graphs and as raw data.
 
-| [CASP12](TODO) |
-| --- |
+| [CASP12 X-Ray](TODO) | [CASP12 X-Ray Raw Data](TODO) | [CASP12 X-Ray+NMR](TODO) | [CASP12 X-Ray+NMR Raw Data](TODO) |
+| --- | --- | --- | --- |
 
 To train new models from scratch using the same hyperparameter choices as the above models, use the appropriate configuration file from [here](https://github.com/mallory-tollefson/rgn/blob/master/configurations/).
 
